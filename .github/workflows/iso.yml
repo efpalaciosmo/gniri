@@ -1,0 +1,52 @@
+name: Build installer ISO
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: installer-iso
+  cancel-in-progress: false
+
+jobs:
+  iso:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Static checks
+        run: make check
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.3
+      - name: Resolve and verify payload, then build ISO
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          image="ghcr.io/${OWNER,,}/gniri"
+          test -s trust/cosign.pub
+          printf '%s' "$REGISTRY_TOKEN" | sudo podman login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          printf '%s' "$REGISTRY_TOKEN" | cosign login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          sudo podman pull "$image:stable"
+          digest=$(sudo podman image inspect --format '{{.Digest}}' "$image:stable")
+          test -n "$digest"
+          cosign verify --new-bundle-format=false --key trust/cosign.pub "$image@$digest"
+          sudo bash scripts/build-iso.sh "$image@$digest" "$image:stable"
+          sudo chown -R "$(id -u):$(id -g)" output/iso
+          find output/iso -type f -name '*.iso' -exec cp {} output/gniri-x86_64.iso \;
+          cd output
+          sha256sum gniri-x86_64.iso > gniri-x86_64.iso.sha256
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gniri-installer-x86_64
+          path: |
+            output/gniri-x86_64.iso
+            output/gniri-x86_64.iso.sha256
+          compression-level: 0
+          retention-days: 7

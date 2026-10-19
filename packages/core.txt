@@ -1,0 +1,17 @@
+# Explicit host tools; no Workstation/desktop package groups or weak dependencies.
+btop
+curl
+fastfetch
+flatpak
+fontconfig
+git
+glibc-langpack-en
+make
+podman
+python3
+stow
+tar
+unzip
+vim-minimal
+xz
+zsh

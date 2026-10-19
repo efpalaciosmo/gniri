@@ -1,0 +1,17 @@
+# Stock signed Fedora kernel/modules and firmware; no akmods or custom kernel.
+amd-gpu-firmware
+amd-ucode-firmware
+bluez
+firewalld
+fwupd
+kernel-modules
+kernel-modules-extra
+libinput
+libwacom
+libwacom-data
+linux-firmware
+mesa-dri-drivers
+mesa-vulkan-drivers
+NetworkManager
+NetworkManager-wifi
+steam-devices

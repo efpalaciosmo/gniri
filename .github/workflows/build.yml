@@ -1,0 +1,88 @@
+name: Build and publish Gniri
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  schedule:
+    # Publish ahead of the workstation's Sunday update window (UTC here).
+    - cron: '20 6 * * 6'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Static checks
+        run: make check
+      - name: Set image names
+        id: image
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          echo "name=ghcr.io/${OWNER,,}/gniri" >> "$GITHUB_OUTPUT"
+      - name: Build
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+          SOURCE: https://github.com/${{ github.repository }}
+        run: |
+          reference=localhost/gniri:development
+          if [[ $PUBLISH == true ]]; then
+            test -s trust/cosign.pub
+            reference="$IMAGE:stable"
+          fi
+          sudo podman build --no-cache --build-arg "IMAGE_REF=$reference" \
+            --build-arg "SOURCE_URL=$SOURCE" -t localhost/gniri:build .
+      - name: Export package and launcher inventory
+        run: |
+          mkdir -p output/inventory
+          container=$(sudo podman create localhost/gniri:build)
+          sudo podman cp "$container:/usr/share/gniri/packages.txt" output/inventory/
+          sudo podman cp "$container:/usr/share/gniri/desktop-entries.txt" output/inventory/
+          sudo podman cp "$container:/usr/share/gniri/visible-applications.txt" output/inventory/
+          sudo podman rm "$container"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gniri-inventory
+          path: output/inventory/
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        with:
+          cosign-release: v3.1.3
+      - name: Publish and sign immutable revision first
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          test -n "$COSIGN_PRIVATE_KEY"
+          test -n "$COSIGN_PASSWORD"
+          printf '%s' "$REGISTRY_TOKEN" | sudo podman login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          printf '%s' "$REGISTRY_TOKEN" | cosign login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          revision="$IMAGE:sha-$GITHUB_SHA-$GITHUB_RUN_ID"
+          sudo podman push --digestfile output/digest localhost/gniri:build "$revision"
+          digest=$(cat output/digest)
+          cosign sign --yes --new-bundle-format=false --use-signing-config=false \
+            --registry-referrers-mode=legacy --key env://COSIGN_PRIVATE_KEY "$IMAGE@$digest"
+          cosign verify --new-bundle-format=false --key trust/cosign.pub "$IMAGE@$digest"
+          # Only expose stable once the same manifest digest has a valid signature.
+          sudo podman push --digestfile output/stable-digest localhost/gniri:build "$IMAGE:stable"
+          test "$digest" = "$(cat output/stable-digest)"

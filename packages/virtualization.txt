@@ -1,0 +1,26 @@
+# x86_64 KVM + ARM TCG emulation, NAT/bridging, UEFI and virtual TPM.
+edk2-aarch64
+edk2-ovmf
+libvirt-client
+libvirt-daemon-config-network
+libvirt-daemon-driver-network
+libvirt-daemon-driver-nodedev
+libvirt-daemon-driver-nwfilter
+libvirt-daemon-driver-qemu
+libvirt-daemon-driver-secret
+# Directory/filesystem pools; no unrequested Ceph, Gluster or iSCSI backends.
+libvirt-daemon-driver-storage-core
+libvirt-daemon-lock
+libvirt-daemon-proxy
+qemu-device-display-virtio-gpu-gl
+qemu-img
+qemu-kvm
+qemu-system-aarch64
+qemu-system-arm
+qemu-ui-opengl
+qemu-ui-spice-core
+swtpm
+swtpm-tools
+virglrenderer
+virt-install
+virt-manager

@@ -1,0 +1,83 @@
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+OVERLAY = ROOT / 'system_files'
+NIRI = OVERLAY / 'etc/niri/config.kdl'
+
+
+class DesktopTests(unittest.TestCase):
+    def test_only_one_niri_config_is_shipped(self):
+        self.assertEqual(list(OVERLAY.rglob('*.kdl')), [NIRI])
+        self.assertLess(len(NIRI.read_text().splitlines()), 100)
+        self.assertNotIn('include ', NIRI.read_text())
+
+    def test_kitty_launcher_and_basic_bindings(self):
+        text = NIRI.read_text()
+        for key, action in (('Mod+Return', 'spawn "kitty"'), ('Mod+D', 'spawn "fuzzel"'),
+                            ('Mod+Q', 'close-window'), ('Mod+Shift+E', 'quit')):
+            self.assertRegex(text, re.escape(key) + r'[^\n]+\{ ' + re.escape(action))
+
+    def test_no_personal_themes_or_first_login_copying(self):
+        self.assertFalse(any((OVERLAY / 'usr/share/gniri/defaults').rglob('*')))
+        for path in ('usr/bin/gniri-user-setup', 'usr/lib/systemd/user/gniri-user-setup.service',
+                     'usr/share/glib-2.0/schemas/90-gniri.gschema.override'):
+            self.assertFalse((OVERLAY / path).exists(), path)
+        self.assertFalse((ROOT / 'scripts/import-dotfiles.py').exists())
+        text = NIRI.read_text()
+        self.assertNotIn('scripts/', text)
+        self.assertNotIn('font', text)
+        self.assertNotIn('backgrounds/', text)
+
+    def test_session_tools_use_package_defaults(self):
+        text = NIRI.read_text()
+        self.assertIn('spawn-at-startup "waybar"', text)
+        self.assertIn('spawn-at-startup "mako"', text)
+        self.assertIn('spawn-at-startup "/usr/bin/lxpolkit"', text)
+        for app in ('waybar', 'mako', 'kitty', 'fuzzel', 'swaylock', 'zathura'):
+            self.assertFalse((OVERLAY / 'etc/xdg' / app).exists())
+
+    def test_screen_lock_is_not_removed_with_the_dotfiles(self):
+        text = NIRI.read_text()
+        self.assertIn('"before-sleep" "swaylock -f"', text)
+        self.assertIn('"timeout" "300" "swaylock -f"', text)
+        self.assertIn('"resume" "niri msg action power-on-monitors"', text)
+
+    def test_flathub_remains_user_only_and_asynchronous(self):
+        text = (OVERLAY / 'usr/lib/systemd/user/gniri-flathub-user.service').read_text()
+        self.assertIn('remote-add --user --if-not-exists flathub', text)
+        self.assertNotIn('flatpak install', text)
+        self.assertIn('DefaultDependencies=no', text)
+        self.assertIn('After=graphical-session.target', text)
+        presets = (OVERLAY / 'usr/lib/systemd/user-preset/00-gniri.preset').read_text()
+        self.assertIn('enable gniri-flathub-user.service', presets)
+        self.assertNotIn('gniri-user-setup', presets)
+
+    def test_fastfetch_and_existing_vi_package(self):
+        packages = (ROOT / 'packages/core.txt').read_text().splitlines()
+        self.assertIn('fastfetch', packages)
+        self.assertIn('vim-minimal', packages)
+        self.assertNotIn('vim-enhanced', packages)
+
+    def test_fedora_backgrounds_and_session_helper_are_explicit(self):
+        packages = (ROOT / 'packages/desktop.txt').read_text().splitlines()
+        for package in ('f44-backgrounds-gnome', 'gnome-backgrounds', 'dbus-tools'):
+            self.assertIn(package, packages)
+        validation = (ROOT / 'build/validate-image.sh').read_text()
+        self.assertIn('/usr/share/gnome-background-properties/f44.xml', validation)
+        self.assertIn('dbus-update-activation-environment', validation)
+
+    def test_graphics_libraries_are_checked_beyond_executable_presence(self):
+        validation = (ROOT / 'build/validate-image.sh').read_text()
+        for library in ('libEGL.so.1', 'libGLESv2.so.2', 'libGL.so.1', 'libgbm.so.1'):
+            self.assertIn(library, validation)
+        self.assertIn('ctypes.CDLL(library)', validation)
+        self.assertIn('import kitty.fast_data_types', validation)
+
+    @unittest.skipUnless(shutil.which('niri'), 'Validated again inside the image build')
+    def test_config_parses_with_niri(self):
+        subprocess.run(['niri', 'validate', '--config', str(NIRI)], check=True,
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)

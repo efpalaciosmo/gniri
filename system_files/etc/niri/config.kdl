@@ -1,0 +1,73 @@
+// Minimal system fallback. Your ~/.config/niri/config.kdl takes precedence.
+// Keep personal themes, scripts and other application settings in your dotfiles.
+input {
+    keyboard {
+        xkb {}
+    }
+    touchpad { tap; }
+}
+
+layout {
+    gaps 12
+    default-column-width { proportion 0.5; }
+}
+
+spawn-at-startup "waybar"
+spawn-at-startup "mako"
+spawn-at-startup "/usr/bin/lxpolkit"
+// Lock before suspend, lock after five minutes, blank displays after ten.
+spawn-at-startup "swayidle" "-w" \
+    "timeout" "300" "swaylock -f" \
+    "timeout" "600" "niri msg action power-off-monitors" \
+    "resume" "niri msg action power-on-monitors" \
+    "before-sleep" "swaylock -f" \
+    "after-resume" "niri msg action power-on-monitors"
+
+// Save to HOME without requiring a first-login directory creation script.
+screenshot-path "~/Screenshot-%Y-%m-%d-%H-%M-%S.png"
+
+binds {
+    Mod+Return repeat=false hotkey-overlay-title="Open terminal" { spawn "kitty"; }
+    Mod+D repeat=false hotkey-overlay-title="Open launcher" { spawn "fuzzel"; }
+    Mod+E repeat=false hotkey-overlay-title="Open files" { spawn "nautilus"; }
+    Mod+Alt+L repeat=false hotkey-overlay-title="Lock screen" { spawn "swaylock" "-f"; }
+    Mod+Shift+Slash { show-hotkey-overlay; }
+    Mod+Q repeat=false { close-window; }
+    Mod+Shift+E repeat=false { quit; }
+    Mod+O repeat=false { toggle-overview; }
+
+    Mod+H { focus-column-left; }
+    Mod+J { focus-window-or-workspace-down; }
+    Mod+K { focus-window-or-workspace-up; }
+    Mod+L { focus-column-right; }
+    Mod+Ctrl+H { move-column-left; }
+    Mod+Ctrl+J { move-window-down-or-to-workspace-down; }
+    Mod+Ctrl+K { move-window-up-or-to-workspace-up; }
+    Mod+Ctrl+L { move-column-right; }
+    Mod+U { focus-workspace-down; }
+    Mod+I { focus-workspace-up; }
+    Mod+Ctrl+U { move-column-to-workspace-down; }
+    Mod+Ctrl+I { move-column-to-workspace-up; }
+    Mod+1 { focus-workspace 1; }
+    Mod+2 { focus-workspace 2; }
+    Mod+3 { focus-workspace 3; }
+    Mod+4 { focus-workspace 4; }
+    Mod+5 { focus-workspace 5; }
+    Mod+R { switch-preset-column-width; }
+    Mod+F { maximize-column; }
+    Mod+Shift+F { fullscreen-window; }
+    Mod+V { toggle-window-floating; }
+    Mod+Comma { consume-window-into-column; }
+    Mod+Period { expel-window-from-column; }
+
+    Print { screenshot; }
+    Ctrl+Print { screenshot-screen; }
+    Alt+Print { screenshot-window; }
+    XF86AudioRaiseVolume allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "0.05+" "-l" "1.0"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "0.05-"; }
+    XF86AudioMute allow-when-locked=true { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"; }
+    XF86AudioPlay allow-when-locked=true { spawn "playerctl" "play-pause"; }
+    XF86AudioNext allow-when-locked=true { spawn "playerctl" "next"; }
+    XF86AudioPrev allow-when-locked=true { spawn "playerctl" "previous"; }
+    Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
+}

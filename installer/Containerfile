@@ -1,0 +1,12 @@
+FROM quay.io/fedora/fedora-bootc:44@sha256:36c7c5495537c5b0900affeb5ba3256954de98271e334a41b3159cc7293a21b7
+ARG PAYLOAD_REF
+ARG TARGET_REF
+COPY installer/prepare.sh /run/gniri-installer-prepare.sh
+COPY scripts/iso-common.sh /run/gniri-iso-common.sh
+RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
+    bash /run/gniri-installer-prepare.sh "${PAYLOAD_REF}" "${TARGET_REF}" \
+    && rm /run/gniri-installer-prepare.sh /run/gniri-iso-common.sh
+# Named directory context exported by scripts/build-iso.sh. Keep this after the
+# expensive installer preparation so a new payload does not invalidate it.
+COPY --from=gniri-payload / /usr/share/gniri/installer-payload/
+RUN skopeo inspect oci:/usr/share/gniri/installer-payload > /dev/null

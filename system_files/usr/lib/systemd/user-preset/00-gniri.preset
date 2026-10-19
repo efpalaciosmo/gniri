@@ -1,0 +1,4 @@
+enable gniri-flathub-user.service
+enable pipewire.socket
+enable pipewire-pulse.socket
+enable wireplumber.service
