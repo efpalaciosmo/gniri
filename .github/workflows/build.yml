@@ -30,6 +30,12 @@ jobs:
           persist-credentials: false
       - name: Static checks
         run: make check
+      - name: Free disk space for the OS image
+        run: |
+          df -h /
+          # Hosted SDKs are unused; image builds and rechunking need this space.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/hostedtoolcache
+          df -h /
       - name: Set image names
         id: image
         env:
