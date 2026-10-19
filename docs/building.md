@@ -165,6 +165,10 @@ paquetes no sustituye la conectividad necesaria para renovar metadatos.
 
 ## Publicación opcional: GHCR y firma
 
+El workflow **Check Gniri** ejecuta `make check` en cada push y pull request,
+incluidos los cambios de documentación. No necesita secretos ni publica imágenes.
+Los workflows de construcción y publicación requieren la configuración siguiente.
+
 1. Crear el repositorio GitHub y habilitar Actions y GHCR.
 2. Ejecutar `cosign generate-key-pair` y proteger la clave privada.
 3. Añadir **solo** `trust/cosign.pub` al repositorio.
