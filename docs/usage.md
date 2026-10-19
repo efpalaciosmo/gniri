@@ -56,6 +56,14 @@ Para 3D: vídeo **Virtio con aceleración 3D** y pantalla **SPICE con OpenGL**,
 local. ARM sobre AMD usa emulación TCG, más lenta que KVM. Los puentes se
 crean explícitamente con NetworkManager; no se cambia tu conexión de red.
 
+## Hardware, VPN y memoria
+
+OpenVPN está integrado en Settings → Network → VPN, con importación de archivos
+de configuración. GNOME ofrece perfiles de energía mediante TuneD/tuned-ppd.
+La swap zram usa el tamaño adaptable Fedora, hasta 8 GiB, con Zstandard nivel 1;
+no necesita partición swap. Para audio USB/Bluetooth y las herramientas de
+diagnóstico, consulta [hardware.md](hardware.md).
+
 ## Actualizaciones
 
 Las ISO creadas con `make iso` contienen una imagen local de desarrollo:

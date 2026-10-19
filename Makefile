@@ -1,6 +1,7 @@
 IMAGE ?= localhost/gniri:development
 SOURCE_URL ?=
 BUILD_NETWORK ?=
+RECHUNK ?= 1
 
 .PHONY: help check check-desktop build iso iso-local iso-published
 help:
@@ -21,6 +22,7 @@ check-desktop: check
 
 build: check
 	podman build $(if $(strip $(BUILD_NETWORK)),--network="$(BUILD_NETWORK)") --layers --build-arg "IMAGE_REF=$(IMAGE)" --build-arg "SOURCE_URL=$(SOURCE_URL)" -t "$(IMAGE)" .
+	@if [ "$(RECHUNK)" = 1 ]; then python3 scripts/rechunk-image.py "$(IMAGE)"; fi
 	@echo 'Podman image ready: $(IMAGE). To generate the installer ISO, run: make iso'
 
 iso: iso-local

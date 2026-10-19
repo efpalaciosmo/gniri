@@ -2,6 +2,8 @@
 adwaita-icon-theme
 adwaita-mono-fonts
 adwaita-sans-fonts
+alsa-ucm
+alsa-utils
 dbus-tools
 f45-backgrounds-gnome
 gdm
@@ -20,7 +22,9 @@ nautilus
 pipewire
 pipewire-alsa
 pipewire-pulseaudio
+pipewire-utils
 polkit
+pulseaudio-utils
 wireplumber
 xdg-desktop-portal-gnome
 xdg-desktop-portal-gtk

@@ -4,6 +4,8 @@ enable NetworkManager-wait-online.service
 enable bluetooth.service
 enable firewalld.service
 enable tailscaled.service
+enable tuned.service
+enable tuned-ppd.service
 enable bootc-fetch-apply-updates.timer
 enable virtqemud.socket
 enable virtnetworkd.socket

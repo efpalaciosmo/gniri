@@ -8,6 +8,12 @@
       "managerFilePatterns": ["/^scripts/build-iso\\.sh$/"],
       "matchStrings": ["builder=(?<depName>ghcr.io/osbuild/image-builder-cli):(?<currentValue>latest)@(?<currentDigest>sha256:[a-f0-9]+)"],
       "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^scripts/rechunk-image\\.py$/"],
+      "matchStrings": ["CHUNKAH_IMAGE = '(?<depName>quay.io/coreos/chunkah):(?<currentValue>v[^@]+)@(?<currentDigest>sha256:[a-f0-9]+)'"],
+      "datasourceTemplate": "docker"
     }
   ]
 }

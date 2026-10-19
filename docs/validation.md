@@ -1,5 +1,89 @@
 # Validation record
 
+## Modern hardware, zram and OCI layer repacking (2026-10-19)
+
+- Added ALSA UCM/SOF, ALSA/PipeWire/PulseAudio client diagnostic tools, explicit
+  modern Wi-Fi firmware (including Intel MVM and its Intel Bluetooth dependency),
+  TuneD/tuned-ppd and NetworkManager OpenVPN with its GNOME editor. The seven-app
+  launcher allowlist is unchanged and still enforced. English remains the
+  selected language. Added backlight and microphone-mute keys to the system
+  Niri fallback without changing personal dotfiles.
+- The payload build validates dynamic ALSA/BlueZ and OpenVPN editor libraries,
+  required Bluetooth codec files, UCM/SOF and Wi-Fi firmware, kernel modules,
+  enabled services, and the packaged zram generator with simulated 2/32 GiB RAM.
+  Empty `/run` directories made by OpenVPN/TuneD scriptlets are removed; the
+  image passes bootc lint with fatal warnings (14 checks, one upstream skip).
+- zram uses `zram-generator-defaults` from Fedora 45: `min(ram, 8192)` MiB,
+  priority 100. A vendor fragment selects `zstd(level=1)`. No disk swap,
+  writeback, custom swappiness, zswap enabling or hibernation configuration.
+- Repacking uses Chunkah v0.6.0 pinned to digest
+  `sha256:f812b02f304ac192cdfa722a7043fd775fa03ed48fa047ff8213c1fe1c4637ab`.
+  It strips the inherited build-time `/sysroot/` contents and the two OSTree
+  image labels as upstream requires, retaining the installed OSTree+composefs
+  backend, Fedora kernel and bootloader. Both `make build` and CI run it before
+  final signing. `RECHUNK=0` is an explicit local diagnostic bypass.
+- Compared **89,197 paths**, including the image root: file hashes, modes,
+  ownership, symlinks and xattrs match. The check allows imported root mode 0555
+  instead of 0755, splitting old hardlinks, and reorganizing identical immutable
+  `/usr` files. It rejects new hardlink aliases involving mutable configuration.
+  OCI architecture, environment, command, entrypoint, user, working directory,
+  stop signal and labels are checked too, except the two intentionally removed
+  OSTree build labels. The destination tag changes only after validation.
+
+Measured gzip layer bytes (same compression format/level; not registry traffic
+including manifests or signatures):
+
+| Image/layout | Compressed layer bytes |
+| --- | ---: |
+| Previous image, original layers | 1,977,864,176 |
+| New hardware image, original layers | 2,099,763,742 |
+| New hardware image, repacked layers | 2,014,509,035 |
+
+Repacking saves **85,254,707 bytes / 4.06%** against the same new image without
+repacking. Adding hardware support still makes the repacked result about 1.85%
+larger than the older image without these features. The image size reported by
+Podman falls from approximately 4.73 to 4.53 GB; this is not installed disk usage.
+In the tested old→new pair, new gzip blobs fall from 1,045,923,874 bytes
+with original layouts to 756,630,332 with repacking, approximately **27.7% less**;
+103 of 128 repacked layers are reused. This is one pair, not a guaranteed saving
+for every update. Switching an existing installation to the new layout initially
+requires fetching the new layers, approximately 2.01 GB in this example.
+
+- Built and imported the new image locally. The pre-repacking image is
+  `11db17e5c7a226b0f2041dfa990130dad2610709f8ff59c098da5d836c60cc31`;
+  the validated repacked image is
+  `313c4dbdc686c461436b3e14f1bff148790b745efe57ccc83aa902aba9ea67dc`.
+- Kitty again mapped a window in nested Niri under headless Weston using the new
+  packages. Weston and software-rendering overrides remain test-only.
+- In a **disposable qcow2 overlay** of the earlier successful Anaconda test
+  installation, bootc imported the repacked image offline from an attached OCI
+  data ISO and switched to it. A normal UEFI/GRUB reboot loaded the new deployment
+  with **SELinux Enforcing**, read-only composefs root and read-only physical
+  sysroot. The original disk was only a read-only backing file and was not edited.
+- With 4 GiB VM RAM, active zram was approximately 3.8 GiB with `[zstd]` and
+  priority 100. With 12 GiB VM RAM it was exactly 8 GiB. zswap reported `N`.
+- The PowerProfiles D-Bus API successfully selected power-saver, balanced,
+  performance and balanced again. TuneD reported the final balanced profile.
+  A synthetic OpenVPN profile imported through NetworkManager, exposed the
+  correct service type and was deleted. No VPN endpoint was contacted.
+- An isolated test user ran WirePlumber/PipeWire against **emulated QEMU HDA**:
+  a real ALSA sink was enumerated, stereo playback completed through the PipeWire
+  ALSA plugin and a one-second recording produced a WAV file. The test granted
+  device ACLs inside the VM because it had no active graphical seat; no legacy
+  audio group was added to Gniri. No host microphone/speakers were passed through.
+- A further `bootc rollback` and UEFI/GRUB reboot returned to the earlier payload
+  with SELinux Enforcing and the old package inventory. The test VM powered off.
+- Source checks and **79 unit tests** pass; ShellCheck passes for the changed
+  Bash validator and actionlint passes for the workflow. Local artifacts are
+  `.cache/hardware-build.log`, `.cache/hardware-final-build.log`,
+  `.cache/hardware-desktop.log`, `.cache/chunk-test/comparison.json`, and
+  `.cache/hardware-vm/{upgrade-and-boot.log,result.log,rollback.log}`.
+- **Not validated:** physical Wi-Fi/Bluetooth, actual Shure/Sennheiser/Apple
+  microphones or headsets, battery life, physical suspend/resume, graphical VPN
+  login with real credentials, full GDM login on hardware, Secure Boot or published
+  registry signature verification. The production installer ISO must be regenerated
+  with `make iso`; this task did not overwrite it or alter the host installation.
+
 ## Installer finalization regression (2026-10-19, afternoon)
 
 - Reproduced the screenshots' exact `mkdir(boot/loader.0): Read-only file system`

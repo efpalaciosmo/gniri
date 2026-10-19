@@ -49,6 +49,7 @@ jobs:
           fi
           sudo podman build --no-cache --build-arg "IMAGE_REF=$reference" \
             --build-arg "SOURCE_URL=$SOURCE" -t localhost/gniri:build .
+          sudo python3 scripts/rechunk-image.py localhost/gniri:build
       - name: Export package and launcher inventory
         run: |
           mkdir -p output/inventory

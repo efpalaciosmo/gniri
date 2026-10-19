@@ -7,7 +7,7 @@ interfaces actuales y cambiar a una arquitectura distinta solo por ser nueva.
 | --- | --- |
 | Base | Tag oficial Fedora 45 bootc fijado por digest, solicitado por el usuario; selección explícita de RPM sin Workstation ni Silverblue. |
 | Despliegue | Backend OSTree con composefs activado, tal como lo suministra Fedora; no backend composefs nativo. |
-| Construcción | Containerfile + Podman/DNF5 y cachés de descarga. Es el flujo directo de derivación bootc; no hace falta añadir mkosi/BuildStream para esta composición. |
+| Construcción | Containerfile + Podman/DNF5 y cachés de descarga. Chunkah reorganiza después las capas OCI, con comparación del contenido y lint antes de sustituir la etiqueta. No hace falta añadir mkosi/BuildStream para esta composición. |
 | Configuración | Respaldo nativo `/etc/niri/config.kdl`; dotfiles exclusivamente del usuario. Se eliminan el importador, copia en login, temas y overrides GNOME. |
 | Actualización | Timer systemd upstream con calendario dominical y `bootc upgrade` sin `--apply`. Calendarios persistentes recuperan ejecuciones perdidas. |
 | Publicación | GHCR, digest inmutable, Cosign y política de firmas en el equipo; no basta con firmar en CI. |

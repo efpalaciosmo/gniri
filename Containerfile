@@ -21,7 +21,7 @@ LABEL containers.bootc="1" \
 COPY system_files/ /
 COPY trust/ /run/gniri-build/trust/
 COPY packages/visible-applications.allow /run/gniri-build/packages/
-COPY build/configure-image.py build/validate-image.sh build/finalize-image.py /run/gniri-build/
+COPY build/configure-image.py build/validate-image.sh build/validate-hardware.py build/finalize-image.py /run/gniri-build/
 RUN python3 /run/gniri-build/configure-image.py "${IMAGE_REF}" \
     && bash /run/gniri-build/validate-image.sh \
     && python3 /run/gniri-build/finalize-image.py \

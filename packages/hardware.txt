@@ -1,9 +1,16 @@
 # Stock signed Fedora kernel/modules and firmware; no akmods or custom kernel.
+alsa-sof-firmware
 amd-gpu-firmware
 amd-ucode-firmware
+atheros-firmware
 bluez
+brcmfmac-firmware
+cirrus-audio-firmware
 firewalld
 fwupd
+intel-audio-firmware
+intel-gpu-firmware
+iwlwifi-mvm-firmware
 kernel-modules
 kernel-modules-extra
 libinput
@@ -12,6 +19,15 @@ libwacom-data
 linux-firmware
 mesa-dri-drivers
 mesa-vulkan-drivers
+microcode_ctl
+mt7xxx-firmware
 NetworkManager
+NetworkManager-config-connectivity-fedora
+NetworkManager-openvpn
+NetworkManager-openvpn-gnome
 NetworkManager-wifi
+realtek-firmware
 steam-devices
+tuned
+tuned-ppd
+zram-generator-defaults

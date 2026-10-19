@@ -57,3 +57,9 @@ for name in ('/run/dnf', '/run/gluster', '/run/selinux-policy', '/run/gniri-buil
     path = Path(name)
     if path.exists():
         shutil.rmtree(path)
+# Package scriptlets create these empty runtime directories. OpenVPN's tmpfiles
+# rules and TuneD itself recreate them at runtime; reject unexpected contents.
+for name in ('/run/openvpn-client', '/run/openvpn-server', '/run/tuned'):
+    path = Path(name)
+    if path.exists():
+        path.rmdir()

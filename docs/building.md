@@ -22,6 +22,39 @@ y el overlay. Las capas y los cachés Podman se reutilizan localmente; los cach�
 de descarga no se incorporan al sistema final. No limpies el almacenamiento de
 Podman después de cada construcción si quieres reutilizarlos.
 
+Después de construir, `make build` reorganiza la imagen con Chunkah fijado por
+versión y digest. La herramienta se ejecuta sin red; la primera descarga de su
+contenedor sí necesita conexión. La imagen se importa y pasa lint bootc, revisión
+de su configuración OCI y comparación completa del contenido, permisos,
+propietarios, enlaces y atributos. La etiqueta se sustituye solo al terminar
+correctamente. Se mantienen 128 capas como máximo y el backend instalado
+OSTree con composefs. Se retira únicamente el repositorio OSTree embebido
+heredado de la construcción y sus dos etiquetas, siguiendo el contrato upstream.
+La comparación acepta el modo raíz 0555 de la imagen importada y la reorganización
+de hardlinks de archivos idénticos en `/usr` inmutable. Rechaza cambios de datos,
+otros permisos o atributos y nuevos alias entre archivos de configuración mutable.
+Separar hardlinks antiguos se admite: bootc copia `/etc` al desplegarlo.
+
+Para diagnosticar la construcción sin esa etapa:
+
+```sh
+make build RECHUNK=0
+```
+
+Para conservar una salida OCI y su informe, sin sustituir la etiqueta original:
+
+```sh
+python3 scripts/rechunk-image.py localhost/gniri:development \
+  --tag localhost/gniri:chunked --output .cache/rechunk-comparison
+```
+
+La salida debe ser un directorio nuevo. Los archivos temporales predeterminados
+van a `.cache/` en disco, no a `/tmp` en RAM. Las firmas se generan después de
+la reorganización; CI firma y publica el digest final. La primera actualización
+desde imágenes antiguas puede necesitar descargar todas las capas nuevas.
+Véanse las [mediciones y pruebas](validation.md); no hay un ahorro fijo garantizado
+para todas las actualizaciones.
+
 Base y constructor ISO fijados por digest; descargas upstream fijadas por
 versión y SHA-256. Los RPM siguen los repositorios vivos de Fedora 45: no hay
 reproducibilidad bit a bit. Renovate puede proponer actualizaciones de digest
