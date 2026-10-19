@@ -14,13 +14,16 @@ Resultado: `localhost/gniri:development`, sin cuentas ni credenciales y sin
 actualizaciones desde un registro. No es un contenedor de aplicación: se
 distribuye para instalarlo como sistema bootc.
 
+**`make build` no genera una ISO:** termina al guardar la imagen de Podman.
+Para obtener el archivo instalador hay que ejecutar `make iso`.
+
 Los manifiestos RPM y las descargas caras se procesan antes que los metadatos
 y el overlay. Las capas y los cachés Podman se reutilizan localmente; los cachés
 de descarga no se incorporan al sistema final. No limpies el almacenamiento de
 Podman después de cada construcción si quieres reutilizarlos.
 
 Base y constructor ISO fijados por digest; descargas upstream fijadas por
-versión y SHA-256. Los RPM siguen los repositorios vivos de Fedora 44: no hay
+versión y SHA-256. Los RPM siguen los repositorios vivos de Fedora 45: no hay
 reproducibilidad bit a bit. Renovate puede proponer actualizaciones de digest
 y de acciones, pero las versiones/checksums en `build/upstream.env` requieren
 revisión explícita.
@@ -52,13 +55,27 @@ Anaconda lee sus blobs directamente mediante `oci:`, sin reconstruirlos en el
 `/var/tmp` de la sesión live. No hay que ampliar `/run`, cambiar sus límites ni
 asignar 10–12 GB de RAM para alojar una copia temporal de la imagen.
 
-La ISO queda bajo `output/iso/`, junto con `SHA256SUMS`. Para localizarla y
-verificar su checksum desde la raíz del proyecto:
+La ISO se publica siempre como **`output/iso/gniri-x86_64.iso`**, junto con
+`output/iso/SHA256SUMS`. El nombre incluye la arquitectura del sistema anfitrión
+soportado por Gniri (x86_64; no se ofrecen ISO ARM). Al terminar se muestra su
+ruta absoluta. Para verificarla desde la raíz del proyecto:
 
 ```sh
-find output/iso -name '*.iso'
-sha256sum --check output/iso/SHA256SUMS
+ls -lh output/iso/gniri-x86_64.iso
+(cd output/iso && sha256sum --check SHA256SUMS)
 ```
+
+El constructor escribe primero en un directorio nuevo y solo publica el archivo
+si hay exactamente una ISO no vacía; una ISO anterior no puede hacer pasar una
+construcción sin salida. Su registro se guarda en **`output/iso-build.log`**.
+Si `make iso` falla en esa fase, revisa:
+
+```sh
+tail -n 80 output/iso-build.log
+```
+
+Si ese registro no existe, el proceso no llegó al constructor ISO: revisa el
+error de `make`, la construcción del contenedor o la autenticación de `sudo`.
 
 **Local no significa construcción sin Internet:** se descargan la base Fedora,
 RPM y herramientas públicas, incluido el contenedor de `image-builder` alojado

@@ -3,7 +3,7 @@ adwaita-icon-theme
 adwaita-mono-fonts
 adwaita-sans-fonts
 dbus-tools
-f44-backgrounds-gnome
+f45-backgrounds-gnome
 gdm
 gnome-backgrounds
 gnome-control-center

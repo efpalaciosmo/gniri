@@ -9,7 +9,7 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+ExecStart=/usr/bin/flatpak remote-add --user --if-not-exists flathub /usr/share/gniri/flathub.flatpakrepo
 RemainAfterExit=yes
 Restart=on-failure
 RestartSec=1min

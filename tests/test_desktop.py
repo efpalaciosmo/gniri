@@ -52,6 +52,8 @@ class DesktopTests(unittest.TestCase):
         self.assertNotIn('flatpak install', text)
         self.assertIn('DefaultDependencies=no', text)
         self.assertIn('After=graphical-session.target', text)
+        self.assertIn('/usr/share/gniri/flathub.flatpakrepo', text)
+        self.assertNotIn('https://flathub.org/repo/flathub.flatpakrepo', text)
         presets = (OVERLAY / 'usr/lib/systemd/user-preset/00-gniri.preset').read_text()
         self.assertIn('enable gniri-flathub-user.service', presets)
         self.assertNotIn('gniri-user-setup', presets)
@@ -62,12 +64,30 @@ class DesktopTests(unittest.TestCase):
         self.assertIn('vim-minimal', packages)
         self.assertNotIn('vim-enhanced', packages)
 
+    def test_distrobox_is_explicit_and_checked(self):
+        self.assertIn('distrobox', (ROOT / 'packages/core.txt').read_text().splitlines())
+        self.assertIn('for command in distrobox ', (ROOT / 'build/validate-image.sh').read_text())
+
+    def test_fedora_first_boot_flatpak_provisioner_is_blocked(self):
+        preset = (OVERLAY / 'usr/lib/systemd/system-preset/00-gniri.preset').read_text()
+        self.assertIn('disable flatpak-add-fedora-repos.service', preset)
+        configure = (ROOT / 'build/configure-image.py').read_text()
+        self.assertIn("['systemctl', 'mask', 'flatpak-add-fedora-repos.service']", configure)
+        validation = (ROOT / 'build/validate-image.sh').read_text()
+        self.assertIn('readlink /etc/systemd/system/flatpak-add-fedora-repos.service', validation)
+
+    def test_official_flathub_descriptor_is_checksum_verified(self):
+        script = (ROOT / 'build/install-upstream.sh').read_text()
+        self.assertIn('https://flathub.org/repo/flathub.flatpakrepo', script)
+        self.assertIn('"$FLATHUB_REPO_SHA256"', script)
+        self.assertIn('/usr/share/gniri/flathub.flatpakrepo', script)
+
     def test_fedora_backgrounds_and_session_helper_are_explicit(self):
         packages = (ROOT / 'packages/desktop.txt').read_text().splitlines()
-        for package in ('f44-backgrounds-gnome', 'gnome-backgrounds', 'dbus-tools'):
+        for package in ('f45-backgrounds-gnome', 'gnome-backgrounds', 'dbus-tools'):
             self.assertIn(package, packages)
         validation = (ROOT / 'build/validate-image.sh').read_text()
-        self.assertIn('/usr/share/gnome-background-properties/f44.xml', validation)
+        self.assertIn('/usr/share/gnome-background-properties/f45.xml', validation)
         self.assertIn('dbus-update-activation-environment', validation)
 
     def test_graphics_libraries_are_checked_beyond_executable_presence(self):

@@ -29,6 +29,20 @@ the VM's DRM/3D setup.
 
 ## Installer and VM
 
+The installer-specific mount regression test runs the real Anaconda tasks on
+disposable tmpfs filesystems (not a disk). After building the installer image,
+use its Podman store (`sudo podman` for the rootful image made by `make iso`):
+
+```sh
+sudo podman run --rm --network=none --cap-add SYS_ADMIN \
+    --entrypoint python3 \
+    -v "$PWD/tests/installer-mount-smoke.py:/run/installer-mount-smoke.py:ro" \
+    localhost/gniri-installer:latest /run/installer-mount-smoke.py
+```
+
+This tests separate home/var and EFI mount ordering, not partitioning, SELinux
+labeling, account login or boot. It does not replace the checks below.
+
 - [ ] Build ISO with the current `image-builder` flow, not a deprecated action.
 - [ ] `make iso` completes locally without GitHub credentials or publication;
       embedded development payload installs with networking disconnected.
@@ -38,6 +52,14 @@ the VM's DRM/3D setup.
       in permissive mode only in the installer. Installed Gniri is Enforcing.
 - [ ] Check that Anaconda requires user confirmation for disk changes.
 - [ ] Offline installation, account creation, first boot and fresh user login.
+- [ ] Btrfs with a separate `home` subvolume: the chosen user's home is on that
+      subvolume, exists through BOTH `/home/$USER` and `/var/home/$USER`, has the
+      right owner/SELinux label, and remains writable after a reboot. Also test
+      a layout without a separate home mount. See [diagnosis and recovery](installer-troubleshooting.md).
+- [ ] Installer initramfs has `/.buildstamp`; native UEFI does not request the
+      BIOS-only `edd` driver from either Anaconda hook. BIOS support remains.
+- [ ] DHCP, DNS and HTTPS work on the host's libvirt NAT network, not just QEMU
+      user networking; verify host firewall rules without disabling protection.
 - [ ] OCI payload installs with 4–6 GiB guest RAM and the live overlay's default
       size: no manual remount, RAM-sized layer spool or `container_images_*`
       failures in `/var/tmp`. Measure peak memory; this is not yet a tested minimum.
@@ -45,11 +67,17 @@ the VM's DRM/3D setup.
 - [ ] Both GDM sessions work and session selection is remembered.
 - [ ] Kitty creates a window in both GNOME and Niri; check Niri's user journal
       on a login failure. Container dependency checks do not prove GDM/DRM works.
-- [ ] Fedora 44 and GNOME backgrounds appear in GNOME's background chooser.
+- [ ] Fedora 45 and GNOME backgrounds appear in GNOME's background chooser.
 - [ ] Fresh Niri login uses `/etc/niri/config.kdl`; user Flathub only.
 - [ ] An existing `~/.config/niri/config.kdl` takes precedence without copying.
 - [ ] Existing configs/Stow links survive login and an image update unchanged.
 - [ ] Login still works without Internet; Flathub provisioning retries later.
+- [ ] Fresh user Flathub registration succeeds offline with GPG verification;
+      no apps or system remotes appear after boot. Container regression:
+      `podman run --rm --network=none --entrypoint bash -v "$PWD/tests/flatpak-smoke.sh:/run/flatpak-smoke.sh:ro" localhost/gniri:development /run/flatpak-smoke.sh`.
+- [ ] `systemd-remount-fs.service` succeeds after installation. `/etc/fstab`
+      must not attempt to remount logical `/` with physical filesystem options;
+      the chosen root subvolume/compression/options remain in `rootflags=`.
 - [ ] GNOME and Niri: audio, networking, Bluetooth, keyring and polkit prompts.
 - [ ] Flatpak file chooser, screen sharing and clipboard work in both sessions.
 - [ ] Idle lock and lock-before-suspend work; no unlocked flash after resume.

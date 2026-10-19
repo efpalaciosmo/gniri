@@ -15,6 +15,7 @@ dnf5 -y --setopt=keepcache=True --setopt=install_weak_deps=False install \
     dracut-config-generic dracut-network net-tools grub2-efi-x64-cdboot \
     grub2-pc-modules plymouth default-fonts-core-sans default-fonts-other-sans \
     google-noto-sans-cjk-fonts xorrisofs squashfs-tools isomd5sum
+python3 /run/gniri-fix-anaconda.py
 # Only this disposable installer environment follows Anaconda's permissive
 # runtime model. Keep SELinux enabled so its policy remains available to bootc.
 # This file is not copied into the separately built desktop payload.
@@ -38,6 +39,9 @@ EOF
 cat > /usr/share/anaconda/interactive-defaults.ks <<EOF
 bootc --source-imgref oci:/usr/share/gniri/installer-payload --target-imgref ${target}
 selinux --enforcing
+%post --nochroot --erroronfail
+/usr/bin/python3 /usr/libexec/gniri-installer-finalize.py
+%end
 EOF
 printf 'install:x:0:0:root:/root:/usr/libexec/anaconda/run-anaconda\n' >> /etc/passwd
 printf 'install::14438:0:99999:7:::\n' >> /etc/shadow
@@ -52,9 +56,19 @@ ln -sfn /usr/lib/systemd/system/anaconda-shell@.service /etc/systemd/system/auto
 mkdir -p /usr/lib/systemd/logind.conf.d
 printf '[Login]\nReserveVT=2\n' > /usr/lib/systemd/logind.conf.d/gniri-installer.conf
 mkdir -p "$(realpath /root)"
+# Lorax normally supplies this metadata. The generic ISO path does not run
+# Lorax, so provide it to both Anaconda's runtime and its dracut cmdline hook.
+cat > /.buildstamp <<EOF
+[Main]
+Product=Gniri
+Version=45
+IsFinal=False
+UUID=$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m%d%H%M).x86_64
+EOF
 kernel=$(find /usr/lib/modules -mindepth 2 -maxdepth 2 -name vmlinuz -printf '%h\n')
 [[ -n $kernel && $kernel != *$'\n'* ]]
 DRACUT_NO_XATTR=1 dracut --force --zstd --reproducible --no-hostonly \
+    --include /.buildstamp /.buildstamp \
     --add anaconda "${kernel}/initramfs.img" "${kernel##*/}"
 for unit in pipewire.service pipewire.socket; do
     mkdir -p "/etc/systemd/user/${unit}.d"

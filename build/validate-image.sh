@@ -34,14 +34,16 @@ for package in firefox fedora-flathub-remote fedora-flatpak-remotes gnome-tour g
 done
 [[ -z $(flatpak remotes --system --columns=name) ]]
 [[ -z $(flatpak list --system --columns=application) ]]
+[[ $(readlink /etc/systemd/system/flatpak-add-fedora-repos.service) == /dev/null ]]
+[[ -s /usr/share/gniri/flathub.flatpakrepo ]]
 [[ -x /usr/bin/lxpolkit ]]
 [[ -f /usr/share/wayland-sessions/niri.desktop ]]
 [[ -f /usr/share/wayland-sessions/gnome.desktop ]]
 [[ -f /usr/share/xdg-desktop-portal/niri-portals.conf ]]
-rpm -q f44-backgrounds-base f44-backgrounds-gnome gnome-backgrounds
-[[ -s /usr/share/gnome-background-properties/f44.xml ]]
-[[ -s /usr/share/backgrounds/f44/default/f44-01-day.jxl ]]
-[[ -s /usr/share/backgrounds/f44/default/f44-01-night.jxl ]]
+rpm -q f45-backgrounds-base f45-backgrounds-gnome gnome-backgrounds
+[[ -s /usr/share/gnome-background-properties/f45.xml ]]
+[[ -s /usr/share/backgrounds/f45/default/f45-01-day.jxl ]]
+[[ -s /usr/share/backgrounds/f45/default/f45-01-night.jxl ]]
 # Niri/Kitty load EGL/GLES/GL at runtime: ldd on the main executable alone
 # cannot prove these libraries are usable. Do not silently accept missing dlopen
 # dependencies when installing without weak RPM dependencies.
@@ -56,7 +58,7 @@ fc-match 'JetBrainsMono Nerd Font' --format '%{family}\n' | grep -F 'JetBrainsMo
 [[ -s /usr/share/licenses/gniri-nerd-fonts/OFL.txt ]]
 niri validate --config /etc/niri/config.kdl
 [[ ! -e /usr/share/gniri/defaults && ! -e /usr/bin/gniri-user-setup ]]
-for command in fastfetch vi kitty niri-session dbus-update-activation-environment fuzzel mako waybar swayidle swaylock nautilus wpctl playerctl; do
+for command in distrobox fastfetch vi kitty niri-session dbus-update-activation-environment fuzzel mako waybar swayidle swaylock nautilus wpctl playerctl; do
     command -v "$command"
 done
 for module in uinput wacom kvm_amd amdgpu; do

@@ -6,8 +6,8 @@ BUILD_NETWORK ?=
 help:
 	@echo 'make check  - static checks and unit tests'
 	@echo 'make check-desktop - test Kitty windows and nested Niri in a disposable headless container'
-	@echo 'make build  - build local development image with Podman'
-	@echo 'make iso    - build a local development ISO; no account or publication required'
+	@echo 'make build  - build the Podman image only (does not create an ISO)'
+	@echo 'make iso    - create output/iso/gniri-x86_64.iso; no account or publication required'
 	@echo 'make iso BUILD_NETWORK=host - use host networking if container DNS is failing'
 	@echo 'make iso-published PAYLOAD_REF=ghcr.io/owner/gniri@sha256:... TARGET_REF=ghcr.io/owner/gniri:stable'
 
@@ -21,6 +21,7 @@ check-desktop: check
 
 build: check
 	podman build $(if $(strip $(BUILD_NETWORK)),--network="$(BUILD_NETWORK)") --layers --build-arg "IMAGE_REF=$(IMAGE)" --build-arg "SOURCE_URL=$(SOURCE_URL)" -t "$(IMAGE)" .
+	@echo 'Podman image ready: $(IMAGE). To generate the installer ISO, run: make iso'
 
 iso: iso-local
 

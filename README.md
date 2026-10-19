@@ -1,6 +1,6 @@
 # Gniri
 
-Sistema personal **Fedora 44 + bootc**, con **GNOME y Niri** seleccionables
+Sistema personal **Fedora 45 + bootc**, con **GNOME y Niri** seleccionables
 desde GDM. Sin navegador, extensiones GNOME ni aplicaciones Flatpak
 preinstaladas; únicamente Flathub de usuario.
 
@@ -9,7 +9,7 @@ shim, GRUB y kernel oficial, sin UKI propio ni backend composefs nativo.
 SELinux es permisivo solo en la ISO instaladora; Gniri instalado debe usar Enforcing.
 
 Incluye Kitty, Waybar, Fuzzel, Mako, Zathura, Fastfetch, vi, Zsh/Starship,
-JetBrainsMono Nerd Font, Tailscale, Podman y QEMU/KVM con virt-manager.
+JetBrainsMono Nerd Font, Tailscale, Podman, Distrobox y QEMU/KVM con virt-manager.
 Preparado para AMD, Wacom y controles de juegos con el kernel oficial Fedora.
 
 Niri tiene [un único archivo básico](system_files/etc/niri/config.kdl):
@@ -25,6 +25,9 @@ make check
 make build
 make iso    # Local: no requiere cuenta GitHub ni publicar la imagen.
 ```
+
+`make build` solo crea la imagen de Podman. `make iso` genera
+**`output/iso/gniri-x86_64.iso`** y muestra su ruta al terminar.
 
 > **En desarrollo:** no instalar en el equipo principal hasta probar la ISO,
 > Secure Boot, actualizaciones y rollback en una VM.

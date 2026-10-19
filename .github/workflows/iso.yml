@@ -39,14 +39,13 @@ jobs:
           cosign verify --new-bundle-format=false --key trust/cosign.pub "$image@$digest"
           sudo bash scripts/build-iso.sh "$image@$digest" "$image:stable"
           sudo chown -R "$(id -u):$(id -g)" output/iso
-          find output/iso -type f -name '*.iso' -exec cp {} output/gniri-x86_64.iso \;
-          cd output
-          sha256sum gniri-x86_64.iso > gniri-x86_64.iso.sha256
+          cd output/iso
+          sha256sum --check SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: gniri-installer-x86_64
           path: |
-            output/gniri-x86_64.iso
-            output/gniri-x86_64.iso.sha256
+            output/iso/gniri-x86_64.iso
+            output/iso/SHA256SUMS
           compression-level: 0
           retention-days: 7

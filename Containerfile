@@ -1,5 +1,5 @@
 # x86_64 host image; ARM machines are guests, not an additional host variant.
-FROM quay.io/fedora/fedora-bootc:44@sha256:36c7c5495537c5b0900affeb5ba3256954de98271e334a41b3159cc7293a21b7
+FROM quay.io/fedora/fedora-bootc:45@sha256:4776d2e96e263938a1b54c5c3a4cdd1c2ca723207b063a58ef36e1eda2fc9d61
 
 # Frequently changed defaults are copied AFTER the expensive RPM transaction.
 COPY packages/*.txt /run/gniri-build/packages/

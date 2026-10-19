@@ -30,7 +30,12 @@ fi
 # Keep this multi-GB staging directory on the build disk, not the host's /tmp.
 mkdir -p output/iso
 payload_dir=$(mktemp -d "$PWD/output/installer-payload.XXXXXX")
-trap 'rm -rf -- "$payload_dir"' EXIT
+build_dir=''
+cleanup() {
+    rm -rf -- "$payload_dir"
+    if [[ -n $build_dir ]]; then rm -rf -- "$build_dir"; fi
+}
+trap cleanup EXIT
 podman save --format oci-dir --output "$payload_dir" "$payload"
 podman build "${network_args[@]}" --layers -f installer/Containerfile \
     --build-context "gniri-payload=$payload_dir" \
@@ -39,11 +44,16 @@ podman build "${network_args[@]}" --layers -f installer/Containerfile \
 # image-builder requires DefaultRootFs even to introspect a generic ISO input.
 # This CLI fallback does not edit the embedded Kickstart or partition any disk:
 # the installed system's filesystem is still selected interactively in Anaconda.
-podman run "${network_args[@]}" --rm --privileged --security-opt label=type:unconfined_t \
-    -v "$PWD/output/iso:/output" \
+# Use fresh output so an older ISO can never make a failed/no-output run pass.
+build_dir=$(mktemp -d "$PWD/output/iso-build.XXXXXX")
+printf 'Generating installer ISO. Build log: %s/output/iso-build.log\n' "$PWD"
+if ! podman run "${network_args[@]}" --rm --privileged --security-opt label=type:unconfined_t \
+    -v "$build_dir:/output" \
     -v /var/lib/containers/storage:/var/lib/containers/storage \
     "$builder" build --output-dir /output \
     --bootc-ref localhost/gniri-installer:latest \
-    --bootc-default-fs ext4 bootc-generic-iso
-find output/iso -type f -name '*.iso' -exec sha256sum {} + > output/iso/SHA256SUMS
-[[ -s output/iso/SHA256SUMS ]]
+    --bootc-default-fs ext4 bootc-generic-iso 2>&1 | tee output/iso-build.log; then
+    printf 'ISO generation failed. See %s/output/iso-build.log; the previous ISO was not replaced.\n' "$PWD" >&2
+    exit 1
+fi
+python3 scripts/publish-iso.py "$build_dir" output/iso

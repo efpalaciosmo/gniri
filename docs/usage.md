@@ -6,8 +6,12 @@ GDM ofrece GNOME y Niri, con Niri como preferencia inicial. No se modifica tu
 shell de inicio de sesión ni se crean `.zshrc` o configuraciones de Starship.
 Para personalizar el escritorio, consulta [dotfiles.md](dotfiles.md).
 
-Flathub se añade como usuario en segundo plano al entrar en la sesión, con
-reintentos si no hay Internet. No instala aplicaciones ni bloquea el escritorio.
+Flathub se añade **como usuario** en segundo plano al entrar en la sesión.
+El descriptor oficial y su clave GPG van dentro de la imagen, verificados por
+SHA-256: registrar el remoto no requiere descargar el descriptor al iniciar.
+Flatpak puede advertir que no puede actualizar metadatos sin red; eso no impide
+que el remoto quede registrado. No se instalan aplicaciones ni se bloquea el
+escritorio. El aprovisionador de remotos Fedora del RPM queda enmascarado.
 
 ```sh
 flatpak remotes --user
@@ -15,6 +19,24 @@ flatpak remotes --system  # Vacío en una instalación nueva.
 flatpak install --user flathub ID_DE_LA_APLICACION
 sudo tailscale up
 ```
+
+El comando es `flatpak remotes --user`, no `flatpak --remotes`. Si falta Flathub:
+
+```sh
+systemctl --user status gniri-flathub-user.service
+journalctl --user -b -u gniri-flathub-user.service
+systemctl --user restart gniri-flathub-user.service
+```
+
+Las instalaciones anteriores pueden conservar el remoto de sistema `fedora`;
+no se borra automáticamente porque podría tener aplicaciones del usuario.
+Revisar primero `flatpak list --system --columns=application,origin`. Solo si
+ya no se usa, retirarlo deliberadamente con
+`sudo flatpak remote-delete --system fedora` (sin `--force`).
+
+Distrobox está incluido junto a Podman. No se crean contenedores ni se descargan
+imágenes automáticamente: `distrobox create` necesita red para obtener su imagen
+si todavía no está en el almacén local.
 
 ## Virtualización
 

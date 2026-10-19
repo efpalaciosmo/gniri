@@ -5,7 +5,7 @@ interfaces actuales y cambiar a una arquitectura distinta solo por ser nueva.
 
 | Área | Decisión y motivo |
 | --- | --- |
-| Base | Fedora 44 bootc oficial fijada por digest; selección explícita de RPM sin Workstation ni Silverblue. |
+| Base | Tag oficial Fedora 45 bootc fijado por digest, solicitado por el usuario; selección explícita de RPM sin Workstation ni Silverblue. |
 | Despliegue | Backend OSTree con composefs activado, tal como lo suministra Fedora; no backend composefs nativo. |
 | Construcción | Containerfile + Podman/DNF5 y cachés de descarga. Es el flujo directo de derivación bootc; no hace falta añadir mkosi/BuildStream para esta composición. |
 | Configuración | Respaldo nativo `/etc/niri/config.kdl`; dotfiles exclusivamente del usuario. Se eliminan el importador, copia en login, temas y overrides GNOME. |
@@ -67,9 +67,10 @@ posteriores, por lo que no se deben confundir sus interfaces y garantías.
 Cosign 3 permite formatos nuevos, pero containers/image no reconoce todos de
 igual manera. Se conserva explícitamente el formato compatible con su política
 `sigstoreSigned`; se debe probar la verificación en el propio cliente bootc.
-El flujo ISO está alineado con la documentación actual, pero aún no se ha
-generado/arrancado una ISO de Gniri. Esa prueba aporta más que cambiar de
-herramienta otra vez.
+El usuario ya generó e instaló ISO de Gniri en QEMU. Se han identificado y
+corregido problemas del instalador; eso no sustituye la validación completa de
+la receta actual ni demuestra que la migración a Fedora 45 esté lista para el
+equipo principal. Véase el registro de validación y sus límites.
 
 El ejemplo actual de image-builder aún usa `interactive-defaults.ks`; Anaconda
 documenta su reemplazo futuro por archivos de configuración. No se inventa una

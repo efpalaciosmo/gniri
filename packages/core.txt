@@ -1,6 +1,7 @@
 # Explicit host tools; no Workstation/desktop package groups or weak dependencies.
 btop
 curl
+distrobox
 fastfetch
 flatpak
 fontconfig

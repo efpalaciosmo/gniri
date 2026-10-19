@@ -38,7 +38,10 @@ if reference.startswith('ghcr.io/'):
 # Preserve ID=fedora / VERSION_ID for package and application compatibility.
 release = Path('/usr/lib/os-release')
 text = release.read_text()
-text = re.sub(r'^PRETTY_NAME=.*$', 'PRETTY_NAME="Gniri (Fedora 44)"', text, flags=re.MULTILINE)
+version = re.search(r'^VERSION_ID=(.+)$', text, flags=re.MULTILINE).group(1).strip('"')
+if version != '45':
+    raise SystemExit(f'Expected the Fedora 45 base, got {version}')
+text = re.sub(r'^PRETTY_NAME=.*$', f'PRETTY_NAME="Gniri (Fedora {version})"', text, flags=re.MULTILINE)
 for key, value in (('VARIANT', '"Gniri"'), ('VARIANT_ID', 'gniri'), ('IMAGE_ID', 'gniri')):
     text = re.sub(rf'^{key}=.*\n?', '', text, flags=re.MULTILINE)
     text += f'\n{key}={value}\n'
@@ -47,6 +50,9 @@ release.write_text(text)
 for path in Path('/usr/bin').glob('gniri-*'):
     path.chmod(0o755)
 subprocess.run(['systemctl', 'preset-all'], check=True)
+# The Flatpak RPM itself ships this first-boot provisioner; checking the
+# build-time remote list alone does not stop it from adding Fedora on boot.
+subprocess.run(['systemctl', 'mask', 'flatpak-add-fedora-repos.service'], check=True)
 subprocess.run(['systemctl', 'set-default', 'graphical.target'], check=True)
 subprocess.run(['systemctl', '--global', 'preset-all'], check=True)
 

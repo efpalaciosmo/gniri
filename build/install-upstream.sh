@@ -27,7 +27,7 @@ install -d /usr/share/fonts/jetbrains-mono-nerd /usr/share/licenses/gniri-nerd-f
 find "$work/fonts" -name 'JetBrainsMonoNerdFont-*.ttf' -exec install -m 0644 -t /usr/share/fonts/jetbrains-mono-nerd/ {} +
 install -m 0644 "$work/fonts/OFL.txt" /usr/share/licenses/gniri-nerd-fonts/
 
-# Starship and zsh-completions are not available in the Fedora 44 repositories.
+# Starship and zsh-completions are not available in the Fedora 45 repositories.
 fetch "starship-${STARSHIP_VERSION}.tar.gz" \
     "https://github.com/starship/starship/releases/download/v${STARSHIP_VERSION}/starship-x86_64-unknown-linux-musl.tar.gz" \
     "$STARSHIP_SHA256"
@@ -42,4 +42,8 @@ install -m 0644 "$work/zsh-completions-${ZSH_COMPLETIONS_VERSION}"/src/_* /usr/s
 install -m 0644 "$work/zsh-completions-${ZSH_COMPLETIONS_VERSION}/LICENSE" /usr/share/licenses/gniri-zsh-completions/
 install -d /usr/share/zsh/site-functions
 starship completions zsh > /usr/share/zsh/site-functions/_starship
+fetch "flathub-${FLATHUB_REPO_SHA256}.flatpakrepo" \
+    'https://flathub.org/repo/flathub.flatpakrepo' "$FLATHUB_REPO_SHA256"
+install -D -m 0644 "$cache/flathub-${FLATHUB_REPO_SHA256}.flatpakrepo" \
+    /usr/share/gniri/flathub.flatpakrepo
 fc-cache --force

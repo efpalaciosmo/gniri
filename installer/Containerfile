@@ -1,11 +1,13 @@
-FROM quay.io/fedora/fedora-bootc:44@sha256:36c7c5495537c5b0900affeb5ba3256954de98271e334a41b3159cc7293a21b7
+FROM quay.io/fedora/fedora-bootc:45@sha256:4776d2e96e263938a1b54c5c3a4cdd1c2ca723207b063a58ef36e1eda2fc9d61
 ARG PAYLOAD_REF
 ARG TARGET_REF
 COPY installer/prepare.sh /run/gniri-installer-prepare.sh
+COPY installer/fix-anaconda.py /run/gniri-fix-anaconda.py
 COPY scripts/iso-common.sh /run/gniri-iso-common.sh
 RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
     bash /run/gniri-installer-prepare.sh "${PAYLOAD_REF}" "${TARGET_REF}" \
-    && rm /run/gniri-installer-prepare.sh /run/gniri-iso-common.sh
+    && rm /run/gniri-installer-prepare.sh /run/gniri-fix-anaconda.py /run/gniri-iso-common.sh
+COPY installer/finalize-target.py /usr/libexec/gniri-installer-finalize.py
 # Named directory context exported by scripts/build-iso.sh. Keep this after the
 # expensive installer preparation so a new payload does not invalidate it.
 COPY --from=gniri-payload / /usr/share/gniri/installer-payload/

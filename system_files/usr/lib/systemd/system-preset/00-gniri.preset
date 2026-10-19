@@ -25,3 +25,4 @@ disable virtproxyd-tls.socket
 disable sshd.service
 disable rpm-ostreed-automatic.timer
 disable dnf-automatic.timer
+disable flatpak-add-fedora-repos.service

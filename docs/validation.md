@@ -1,5 +1,98 @@
 # Validation record
 
+## Fedora 45, Flathub and remount follow-up (2026-10-19)
+
+- At the user's explicit request, both images now use the official `45` tag,
+  pinned to `sha256:4776d2e96e263938a1b54c5c3a4cdd1c2ca723207b063a58ef36e1eda2fc9d61`.
+  The fetched base reports `VERSION_ID=45`, `RELEASE_TYPE=stable`; Fedora's
+  public releases JSON still lists 45 Beta. This inconsistency was disclosed;
+  tag availability/metadata is not a production-readiness guarantee.
+- `make build BUILD_NETWORK=host` passed: official Fedora kernel/shim/GRUB,
+  OSTree+composefs, persistent `/etc`/`/var`, SELinux Enforcing, correct Fedora 45
+  backgrounds, graphics library checks, unchanged seven-app launcher allowlist,
+  and 14 bootc lint checks (one upstream skip). Distrobox 1.8.2.5 is installed;
+  no containers are pre-created. NetworkManager, resolved and firewalld are enabled.
+- `make check-desktop BUILD_NETWORK=host` passed on Fedora 45: a Kitty window
+  mapped in nested Niri under test-only headless Weston. This is not a GDM or
+  physical GPU/monitor validation.
+- `tests/flatpak-smoke.sh` passed with `--network=none` as a disposable UID-1000
+  user: the bundled, checksum-verified official descriptor registered Flathub;
+  its URL/key and GPG verification were checked, a second run was idempotent,
+  and no user apps or system remotes were created. An offline summary warning
+  is expected. The Fedora first-boot remote provisioner is disabled AND masked.
+  Existing installed-system remotes are deliberately not deleted automatically.
+- The complete Fedora 45 installer built as
+  `localhost/gniri-installer:fedora45-validation`, with the rebuilt Fedora 45
+  OCI payload. Its Kickstart parsed with an error-on-failure non-chroot finalizer.
+  The real Anaconda 45.29-1 mount tasks passed all four tmpfs layouts. Its
+  upstream home fix is retained/checked rather than overwritten with the 44 patch.
+- Reproduced `systemd-remount-fs` failing with
+  `overlay: No changes allowed in reconfigure` in a copy of the user's Fedora 44
+  installation. Executed the new root-fstab finalizer in a disposable qcow2 overlay,
+  preserving `root=`, other kargs, `subvol=root` and `compress=zstd:1`. After a second
+  QEMU/KVM boot using the resulting BLS arguments, the service reported
+  **ActiveState=active, SubState=exited, Result=success**; `/` and `/sysroot` stayed
+  read-only and SELinux stayed **Enforcing**. Other fstab entries were unchanged.
+  This validates the actual migration/boot behavior, not a fresh Fedora 45 ISO
+  installation; direct kernel boot bypassed UEFI/Secure Boot.
+- `make check`: 70 tests pass; changed Bash scripts pass ShellCheck, and
+  `git diff --check` passes. Original VM/disk/host firewall were not changed.
+- Host UFW configuration has DROP input/forward policies and no user exceptions
+  for libvirt; kernel logs explicitly show blocked Podman DNS forwarding from
+  `podman0` to `wlan0`. This explains the rootful build DNS error. Guest DHCP on
+  libvirt still needs the scoped host firewall allowances and a runtime retest;
+  no claim is made that changing the Fedora image alone fixes that host path.
+- Still pending: privileged ISO generation, a fresh Fedora 45 Anaconda install
+  and graphical login, Secure Boot, physical hardware, updates and rollback.
+  The screenshots did not include Fastfetch's disks output; that specific disk
+  layout cannot be judged without its output/`lsblk`/`findmnt`.
+
+## Home directory and networking diagnosis (2026-10-19)
+
+- Inspected a sparse copy of the shut-down `fedora44` VM disk with libguestfs.
+  The original disk, VM definition and host firewall were not changed.
+- Confirmed `/home -> var/home` and an `efrain` account whose home is
+  `/home/efrain`. Anaconda created its directory in the stateroot's backing
+  `/var/home`, but `fstab` mounts a separate, empty Btrfs `home` subvolume there
+  on boot. This is hidden installation state, not proof the user was never created.
+- Fedora's Anaconda 44.30-2 unmounts `/home` in `DeployBootcTask._clean_physroot`
+  and omits its deployment bind mount in `PrepareBootcMountTargetsTask.run`.
+  Applied the relevant mount-preservation/binding logic from upstream
+  [dc4d94d279fe / #7220](https://github.com/rhinstaller/anaconda/pull/7220), keeping
+  Fedora 44's supported mountpoint allowlist. The checked fix applies to the
+  actual installed RPM source and the patched module compiles.
+- Added installer runtime/initramfs `.buildstamp` metadata and guarded both
+  Anaconda `edd` requests on native UEFI. The actual RPM hooks patch successfully
+  and pass Bash syntax checks. This does not remove or blacklist the BIOS driver.
+- Original guest journal: virtio Ethernet/link detected; DHCP repeatedly times
+  out with `ip-config-unavailable`. Host libvirt NAT/DHCP is configured but has
+  no leases; host UFW is active and logs `virbr0` blocks. These observations do
+  not alone identify the exact dropping firewall rule.
+- Booted a disposable qcow2 overlay of that same installed system with QEMU/KVM
+  user networking. NetworkManager acquired `10.0.2.15` via DHCP; DNS resolved
+  `fedoraproject.org` and HTTPS returned HTTP 200. SELinux remained Enforcing.
+  The only injected guest files were a diagnostic oneshot/script in the overlay;
+  no network settings or installed packages were changed. Direct kernel boot
+  bypassed UEFI/Secure Boot; this is not a Secure Boot or desktop test.
+- `make check`: 55 tests pass, including mount preservation/order and BIOS/UEFI
+  hook branches. ShellCheck passes for the changed installer shell script.
+- The real patched Anaconda cleanup/preparation tasks passed four disposable
+  tmpfs/bind-mount tests: separate home, no separate home, separate home+var,
+  and EFI without a separate `/boot`. The tests write a UID-1000 home through
+  the deployment and verify it reaches the intended persistent mount; the EFI
+  bind remains visible too. This caught and corrected parent `/boot` ordering
+  that would otherwise hide the nested EFI bind. No partitioner or disks are
+  used by `tests/installer-mount-smoke.py`; SELinux labels/login are not tested.
+- The complete installer Containerfile rebuilt successfully as
+  `localhost/gniri-installer:mounts-validation`, including its embedded OCI
+  payload and regenerated initramfs. The four mount tests also pass against
+  that final image. The initramfs `.buildstamp` matches the runtime file and
+  both embedded Anaconda hooks contain the UEFI guard. Privileged ISO generation
+  was not run (`sudo` requires interactive authentication).
+- A new end-to-end Anaconda installation is still required.
+- See [Spanish diagnosis, safe recovery and host-network checks](installer-troubleshooting.md).
+  Recovery commands are documented, not executed against the original VM.
+
 ## Installer memory and desktop follow-up (2026-10-19)
 
 - The user reports that the previous ISO installs and permits login with 10 GiB
