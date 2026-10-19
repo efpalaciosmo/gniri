@@ -25,7 +25,9 @@ if reference.startswith('ghcr.io/'):
     shutil.copyfile(public_key, share / 'keys/cosign.pub')
     repository = reference.rsplit(':', 1)[0]
     policy_path = Path('/etc/containers/policy.json')
-    policy = json.loads(policy_path.read_text())
+    # Fedora ships its default under /usr/share; preserve any /etc override.
+    policy_source = policy_path if policy_path.exists() else Path('/usr/share/containers/policy.json')
+    policy = json.loads(policy_source.read_text())
     policy.setdefault('transports', {}).setdefault('docker', {})[repository] = [{
         'type': 'sigstoreSigned', 'keyPath': '/usr/share/gniri/keys/cosign.pub',
         'signedIdentity': {'type': 'matchRepository'},
