@@ -18,10 +18,10 @@ spec.loader.exec_module(fixes)
 class InstallerInitramfsTests(unittest.TestCase):
     def test_buildstamp_is_in_runtime_and_initramfs(self):
         script = (ROOT / 'installer/prepare.sh').read_text()
-        self.assertIn('cat > /.buildstamp <<EOF', script)
-        self.assertIn('Product=Gniri\nVersion=45\nIsFinal=False\n', script)
+        self.assertIn('python3 /run/gniri-write-buildstamp.py', script)
+        self.assertIn('COPY installer/write-buildstamp.py', (ROOT / 'installer/Containerfile').read_text())
         self.assertIn('--include /.buildstamp /.buildstamp', script)
-        self.assertLess(script.index('cat > /.buildstamp'), script.index('DRACUT_NO_XATTR=1'))
+        self.assertLess(script.index('python3 /run/gniri-write-buildstamp.py'), script.index('DRACUT_NO_XATTR=1'))
 
     def test_edd_is_requested_only_on_bios_in_both_hooks(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -58,6 +58,7 @@ class InstallerInitramfsTests(unittest.TestCase):
 class BootcMountTests(unittest.TestCase):
     def test_fedora45_keeps_upstream_cleanup_and_fixes_parent_order(self):
         source = ('class DeployBootcTask:\n    def _clean_physroot(self):\n        pass\n'
+                  '    def run(self):\n        args = [\n' + fixes.DEPLOY_OLD + '        ]\n'
                   'class PrepareBootcMountTargetsTask:\n    def run(self):\n' + fixes.BOOT_ORDER_OLD)
         cleanup = ast.parse(source).body[0].body[0]
         digest = hashlib.sha256(ast.dump(cleanup).encode()).hexdigest()
@@ -67,6 +68,7 @@ class BootcMountTests(unittest.TestCase):
             with patch.object(fixes, 'CLEANUP_45_SHA256', digest):
                 fixes.fix_bootc_mounts(path)
             self.assertIn(fixes.BOOT_ORDER_NEW, path.read_text())
+            self.assertIn(fixes.DEPLOY_NEW, path.read_text())
             self.assertEqual(ast.dump(ast.parse(path.read_text()).body[0].body[0]), ast.dump(cleanup))
 
     def test_unknown_fedora45_cleanup_is_rejected_without_editing(self):
@@ -117,6 +119,7 @@ class BootcMountTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / 'installation.py'
             path.write_text('class DeployBootcTask:\n    def clean(self):\n' + fixes.CLEAN_OLD +
+                            '\n    def run(self):\n        args = [\n' + fixes.DEPLOY_OLD + '        ]\n' +
                             '\nclass PrepareBootcMountTargetsTask:\n    def run(self):\n' + fixes.MOUNTS_OLD)
             fixes.fix_bootc_mounts(path)
             self.assertIn(fixes.CLEAN_NEW, path.read_text())

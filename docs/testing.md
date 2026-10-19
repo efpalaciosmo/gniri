@@ -43,6 +43,21 @@ sudo podman run --rm --network=none --cap-add SYS_ADMIN \
 This tests separate home/var and EFI mount ordering, not partitioning, SELinux
 labeling, account login or boot. It does not replace the checks below.
 
+The finalizer regression uses real OSTree deployments and BLS entries on tmpfs,
+with and without a separate `/boot`. It reproduces the read-only boot failure,
+checks that failed writes retain `fstab`, then checks successful migration,
+boot-argument readback, repeated console arguments and idempotency:
+
+```sh
+sudo podman run --rm --network=none --cap-add SYS_ADMIN \
+    --security-opt label=disable --entrypoint python3 \
+    -v "$PWD:/src:ro" localhost/gniri-installer:latest \
+    /src/tests/installer-finalize-smoke.py
+```
+
+The security-label override applies only to this disposable test container's
+repository mount; it does not change the installer or installed SELinux mode.
+
 - [ ] Build ISO with the current `image-builder` flow, not a deprecated action.
 - [ ] `make iso` completes locally without GitHub credentials or publication;
       embedded development payload installs with networking disconnected.
@@ -58,6 +73,10 @@ labeling, account login or boot. It does not replace the checks below.
       a layout without a separate home mount. See [diagnosis and recovery](installer-troubleshooting.md).
 - [ ] Installer initramfs has `/.buildstamp`; native UEFI does not request the
       BIOS-only `edd` driver from either Anaconda hook. BIOS support remains.
+- [ ] Installer `IsFinal` matches the base's `RELEASE_TYPE`; stable bases do not
+      show a forced pre-release label, while development bases retain the warning.
+- [ ] The actual Anaconda bootc deployment command includes `--skip-finalize`;
+      target `/boot` remains writable through configuration and the finalizer.
 - [ ] DHCP, DNS and HTTPS work on the host's libvirt NAT network, not just QEMU
       user networking; verify host firewall rules without disabling protection.
 - [ ] OCI payload installs with 4–6 GiB guest RAM and the live overlay's default

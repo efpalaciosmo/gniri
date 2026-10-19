@@ -54,6 +54,22 @@ def migrate_fstab(path, existing_flags, write_kernel_flags):
     return True
 
 
+def deployment_arguments(sysroot):
+    deployments = sysroot.get_deployments()
+    if len(deployments) != 1:
+        raise RuntimeError(f'Expected one fresh installation deployment, got {len(deployments)}; '
+                           'check that the target /boot is mounted')
+    return deployments[0], shlex.split(deployments[0].get_bootconfig().get('options'))
+
+
+def verify_arguments(before, after, flags):
+    expected = [arg for arg in before if not arg.startswith(('rootflags=', 'ostree='))]
+    actual = [arg for arg in after if not arg.startswith(('rootflags=', 'ostree='))]
+    saved_flags = [arg for arg in after if arg.startswith('rootflags=')]
+    if actual != expected or saved_flags != [f'rootflags={flags}']:
+        raise RuntimeError('Saved boot arguments do not match the rootflags migration; keeping fstab')
+
+
 def finalize(physical):
     import gi
     gi.require_version('OSTree', '1.0')
@@ -64,14 +80,10 @@ def finalize(physical):
         raise RuntimeError('Expected a mounted offline installation target, not the running root')
     sysroot = OSTree.Sysroot.new(Gio.File.new_for_path(str(physical)))
     sysroot.load(None)
-    deployments = sysroot.get_deployments()
-    if len(deployments) != 1:
-        raise RuntimeError(f'Expected one fresh installation deployment, got {len(deployments)}; '
-                           'check that the target /boot is mounted')
-    deployment = deployments[0]
+    deployment, before = deployment_arguments(sysroot)
     root = Path(sysroot.get_deployment_directory(deployment).get_path())
     arguments = dict(argument.split('=', 1) if '=' in argument else (argument, '')
-                     for argument in shlex.split(deployment.get_bootconfig().get('options')))
+                     for argument in before)
     if not arguments.get('root'):
         raise RuntimeError('No root= kernel argument; refusing to remove the fstab fallback')
     existing_flags = arguments.get('rootflags', '')
@@ -81,6 +93,11 @@ def finalize(physical):
             subprocess.run(['ostree', 'admin', 'instutil', 'set-kargs',
                             f'--sysroot={physical}', '--merge', f'--replace=rootflags={flags}'],
                            check=True)
+            # Read back the on-disk BLS configuration, not the cached deployment.
+            saved = OSTree.Sysroot.new(Gio.File.new_for_path(str(physical)))
+            saved.load(None)
+            _, after = deployment_arguments(saved)
+            verify_arguments(before, after, flags)
 
     changed = migrate_fstab(root / 'etc/fstab', existing_flags, write_flags)
     print('Root fstab entry migrated to kernel arguments.' if changed else

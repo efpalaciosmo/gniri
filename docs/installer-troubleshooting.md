@@ -134,6 +134,39 @@ Una ISO nueva no repara automáticamente el `fstab` de la instalación anterior.
 No borrar a mano su entrada de `/` sin comprobar primero `root=` y todas sus
 opciones en `rootflags=` y tener una copia del disco.
 
+### Error fatal `mkdir(boot/loader.0): Read-only file system`
+
+El error ocurre antes de retirar la entrada de `/` de `fstab`, por lo que
+también explica que el fallo de remount reaparezca en esa instalación.
+`bootc install to-filesystem` finaliza la raíz física **y `/boot`** en solo
+lectura por defecto. Anaconda aún debe configurar el destino y ejecutar los
+scripts de instalación; su tarea de montajes reabría la raíz pero no `/boot`.
+La transacción OSTree no podía crear la siguiente generación del cargador.
+
+La integración ahora pasa `--skip-finalize` a esa llamada de bootc: Anaconda
+conserva el control de los montajes hasta terminar la configuración y el
+desmontaje final. Es la interfaz de bootc para instaladores externos, no un
+cambio del modo de montaje del sistema instalado. El finalizador relee las
+entradas de arranque guardadas y comprueba las opciones físicas y los demás
+argumentos antes de retirar la entrada de `fstab`. Un error de escritura o de
+verificación sigue deteniendo la instalación y conserva esa entrada.
+
+Véase la [implementación de instalación de bootc](https://github.com/bootc-dev/bootc/blob/main/crates/lib/src/install.rs).
+
+## «PRE-RELEASE / TESTING» en la pantalla de instalación
+
+El instalador es **Anaconda**, no Calamares. Ese texto procede de `IsFinal` en
+`/.buildstamp`; la receta anterior imponía `False`, independientemente de la
+base usada. Ahora se generan `Version` e `IsFinal` desde `VERSION_ID` y
+`RELEASE_TYPE` de la base Fedora instalada: `stable` produce `True`; una base
+de desarrollo o sin esa información conserva el aviso. Los mismos metadatos
+se incluyen en el entorno instalador y en su initramfs. No se altera el código
+de la interfaz para esconder avisos.
+
+La base fijada de Fedora 45 declara `RELEASE_TYPE=stable`. Esto explica la
+etiqueta que generará la ISO; no certifica que Gniri haya completado su
+[validación de publicación](testing.md).
+
 ## Discos mostrados por Fastfetch
 
 Varias rutas no equivalen a varios discos físicos. En bootc es normal ver una

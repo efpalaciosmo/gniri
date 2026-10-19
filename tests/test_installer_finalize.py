@@ -11,6 +11,19 @@ spec.loader.exec_module(finalize)
 
 
 class RootMountTests(unittest.TestCase):
+    def test_readback_preserves_repeated_console_and_storage_arguments(self):
+        before = ['root=UUID=root', 'rw', 'rootflags=subvol=root', 'console=tty0',
+                  'console=ttyS0,115200', 'rd.luks.uuid=luks-test', 'ostree=/ostree/boot.0/test']
+        after = [arg.replace('rootflags=subvol=root', 'rootflags=subvol=root,compress=zstd:1')
+                 .replace('/ostree/boot.0/', '/ostree/boot.1/') for arg in before]
+        finalize.verify_arguments(before, after, 'subvol=root,compress=zstd:1')
+        for broken in (after[:-2] + after[-1:],
+                       [arg for arg in after if not arg.startswith('rootflags=')],
+                       after + ['rootflags=subvol=wrong'],
+                       [arg.replace('compress=zstd:1', 'compress=zstd:3') for arg in after]):
+            with self.subTest(arguments=broken), self.assertRaises(RuntimeError):
+                finalize.verify_arguments(before, broken, 'subvol=root,compress=zstd:1')
+
     def test_btrfs_compression_and_subvolume_are_preserved(self):
         text = ('# anaconda\nUUID=root / btrfs subvol=root,compress=zstd:1,ro 0 0\n'
                 'UUID=boot /boot ext4 defaults 1 2\nUUID=home /home btrfs subvol=home 0 0\n')

@@ -58,13 +58,7 @@ printf '[Login]\nReserveVT=2\n' > /usr/lib/systemd/logind.conf.d/gniri-installer
 mkdir -p "$(realpath /root)"
 # Lorax normally supplies this metadata. The generic ISO path does not run
 # Lorax, so provide it to both Anaconda's runtime and its dracut cmdline hook.
-cat > /.buildstamp <<EOF
-[Main]
-Product=Gniri
-Version=45
-IsFinal=False
-UUID=$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m%d%H%M).x86_64
-EOF
+python3 /run/gniri-write-buildstamp.py
 kernel=$(find /usr/lib/modules -mindepth 2 -maxdepth 2 -name vmlinuz -printf '%h\n')
 [[ -n $kernel && $kernel != *$'\n'* ]]
 DRACUT_NO_XATTR=1 dracut --force --zstd --reproducible --no-hostonly \

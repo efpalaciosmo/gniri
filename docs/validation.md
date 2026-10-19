@@ -1,5 +1,46 @@
 # Validation record
 
+## Installer finalization regression (2026-10-19, afternoon)
+
+- Reproduced the screenshots' exact `mkdir(boot/loader.0): Read-only file system`
+  failure using OSTree 2026.4 from the Fedora 45 installer and a separate,
+  read-only tmpfs `/boot`. The failed transaction retained the original `fstab`.
+  The earlier direct-kernel VM test below reopened mounts manually and did not
+  test Anaconda's complete installation lifecycle.
+- Corrected the lifecycle: Anaconda's `bootc install to-filesystem` invocation
+  passes `--skip-finalize`, keeping the offline target writable until Anaconda
+  completes configuration and unmounts it. The finalizer now reloads the saved
+  deployment and verifies rootflags and the other arguments before editing
+  `fstab`. Real OSTree smoke tests pass with shared/separate `/boot`, including
+  preservation of repeated `console=` arguments, backup and idempotency.
+- Rebuilt `localhost/gniri-installer:finalize-validation` successfully. Its
+  `/.buildstamp` reports `Version=45`, `IsFinal=True`, derived from the base's
+  `VERSION_ID=45`, `RELEASE_TYPE=stable`. Unit tests also retain the pre-release
+  warning for development, beta, unknown or missing maturity. Both runtime and
+  initramfs use the generated buildstamp; no UI widget or warning is suppressed.
+- Performed a **fresh Fedora 45 Anaconda installation**, followed by a normal
+  UEFI/GRUB boot of the resulting disk in QEMU/KVM with 4 GiB RAM. The test used
+  the existing ISO's embedded payload plus Anaconda's official `inst.updates`
+  mechanism to load the rebuilt install task, finalizer and buildstamp. Only
+  `.cache/finalize-vm/install.qcow2`, a new disposable 30 GiB disk, was attached.
+  The test Kickstart is isolated in `.cache`; disk-erasure directives were not
+  added to the interactive installer shipped by the project.
+- Anaconda finished all post-installation scripts and powered off normally.
+  On first boot, the verification service reported **ActiveState=active,
+  SubState=exited, Result=success** for `systemd-remount-fs`, **SELinux Enforcing**,
+  read-only composefs `/` and physical `/sysroot`, and writable Btrfs `/home`.
+  The test user's home existed on its home subvolume with the correct owner.
+  `/proc/cmdline` retained `rootflags=subvol=root,compress=zstd:1`; `/etc/fstab`
+  retained `/boot`, EFI and home entries, without the physical-root `/` entry.
+  Serial logs are local artifacts under `.cache/finalize-vm/` and the extracted
+  result is `.cache/finalize-first-boot-result.log`.
+- `make check`: **73 tests passed**. ShellCheck passed for the changed installer
+  recipe; the rebuilt Anaconda tasks passed all four existing mount layouts.
+- This test did **not** validate Secure Boot, graphical login or upgrades. The
+  production ISO at `output/iso/gniri-x86_64.iso` still needs regeneration with
+  `make iso`; rootful Podman requires interactive sudo authentication here.
+  Existing user VM disks were not modified.
+
 ## Fedora 45, Flathub and remount follow-up (2026-10-19)
 
 - At the user's explicit request, both images now use the official `45` tag,

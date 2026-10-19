@@ -3,10 +3,11 @@ ARG PAYLOAD_REF
 ARG TARGET_REF
 COPY installer/prepare.sh /run/gniri-installer-prepare.sh
 COPY installer/fix-anaconda.py /run/gniri-fix-anaconda.py
+COPY installer/write-buildstamp.py /run/gniri-write-buildstamp.py
 COPY scripts/iso-common.sh /run/gniri-iso-common.sh
 RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
     bash /run/gniri-installer-prepare.sh "${PAYLOAD_REF}" "${TARGET_REF}" \
-    && rm /run/gniri-installer-prepare.sh /run/gniri-fix-anaconda.py /run/gniri-iso-common.sh
+    && rm /run/gniri-installer-prepare.sh /run/gniri-fix-anaconda.py /run/gniri-write-buildstamp.py /run/gniri-iso-common.sh
 COPY installer/finalize-target.py /usr/libexec/gniri-installer-finalize.py
 # Named directory context exported by scripts/build-iso.sh. Keep this after the
 # expensive installer preparation so a new payload does not invalidate it.

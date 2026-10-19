@@ -72,6 +72,15 @@ BOOT_ORDER_NEW = '''        # The parent /boot bind must precede /boot/efi, even
         })
 '''
 
+# Anaconda still has to configure the target after bootc deploys it. Without
+# this external-installer option bootc finalizes BOTH root and /boot read-only;
+# PrepareBootcMountTargetsTask only reopens root, leaving /boot unwritable for
+# the post-install kernel-argument transaction. Anaconda owns the final unmount.
+DEPLOY_OLD = '''            "to-filesystem",
+'''
+DEPLOY_NEW = DEPLOY_OLD + '''            "--skip-finalize",
+'''
+
 
 def replace_once(path, old, new):
     text = path.read_text()
@@ -109,6 +118,7 @@ def fix_bootc_mounts(path):
         if hashlib.sha256(ast.dump(cleanup).encode()).hexdigest() != CLEANUP_45_SHA256:
             raise RuntimeError(f'{path}: Anaconda changed; review mount preservation')
         replace_once(path, BOOT_ORDER_OLD, BOOT_ORDER_NEW)
+    replace_once(path, DEPLOY_OLD, DEPLOY_NEW)
     compile(path.read_text(), str(path), 'exec')
 
 
