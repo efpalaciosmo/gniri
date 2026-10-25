@@ -41,6 +41,9 @@ podman build "${network_args[@]}" --layers -f installer/Containerfile \
     --build-context "gniri-payload=$payload_dir" \
     --build-arg "PAYLOAD_REF=$payload" --build-arg "TARGET_REF=$target" \
     -t localhost/gniri-installer:latest .
+# COPY has embedded these blobs in the installer image. Release the staging
+# copy before osbuild creates its filesystem trees, squashfs and ISO exports.
+rm -rf -- "$payload_dir"
 # image-builder requires DefaultRootFs even to introspect a generic ISO input.
 # This CLI fallback does not edit the embedded Kickstart or partition any disk:
 # the installed system's filesystem is still selected interactively in Anaconda.
