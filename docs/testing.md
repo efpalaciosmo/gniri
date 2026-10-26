@@ -17,7 +17,7 @@ the VM's DRM/3D setup.
 - [x] `make build`: RPM resolution, upstream checksums, font discovery,
       modules, desktop sessions and `bootc container lint`.
 - [x] First-build launcher review: Files, Settings, Software, Kitty, Zathura,
-      virt-manager and btop. Subsequent builds enforce the allowlist.
+      virt-manager and btop. Subsequent builds enforce the allowlist, now including nvtop.
 - [x] No Firefox, unwanted GNOME applications, system remotes or Flatpak apps.
 - [x] User session units pass `systemd-analyze verify`; no ordering cycles.
 - [ ] No `/usr/local/sbin` creation warning from tmpfiles on the regenerated ISO
@@ -108,6 +108,8 @@ repository mount; it does not change the installer or installed SELinux mode.
 ## Physical AMD workstation
 
 - [ ] RX 9070 XT: amdgpu, RADV/Vulkan, OpenGL, monitors and suspend/resume.
+- [ ] `glxinfo -B`, `vulkaninfo --summary`, `vainfo`, `nvtop` and `amd-smi` on real
+      AMD/Intel hardware. Verify camera capture and OpenCL device enumeration.
 - [ ] Wacom: exact model, USB/Bluetooth, pen pressure, output mapping and buttons
       in both GNOME and Niri; test in the intended note-taking application.
 - [ ] Controllers: each USB, Bluetooth and wireless receiver model, Steam Input

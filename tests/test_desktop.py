@@ -58,11 +58,11 @@ class DesktopTests(unittest.TestCase):
         self.assertIn('enable gniri-flathub-user.service', presets)
         self.assertNotIn('gniri-user-setup', presets)
 
-    def test_fastfetch_and_existing_vi_package(self):
+    def test_fastfetch_and_both_vim_commands(self):
         packages = (ROOT / 'packages/core.txt').read_text().splitlines()
         self.assertIn('fastfetch', packages)
         self.assertIn('vim-minimal', packages)
-        self.assertNotIn('vim-enhanced', packages)
+        self.assertIn('vim-enhanced', packages)
 
     def test_distrobox_is_explicit_and_checked(self):
         self.assertIn('distrobox', (ROOT / 'packages/core.txt').read_text().splitlines())

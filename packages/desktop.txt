@@ -15,10 +15,14 @@ gnome-session-wayland-session
 gnome-settings-daemon
 gnome-shell
 gnome-software
+gstreamer1-plugin-openh264
 gvfs-afc
 gvfs-mtp
 gvfs-smb
 nautilus
+libheif
+libxcrypt-compat
+openh264
 pipewire
 pipewire-alsa
 pipewire-pulseaudio

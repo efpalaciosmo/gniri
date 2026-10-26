@@ -1,6 +1,7 @@
 # Deliberately visible host applications. Build fails if dependencies add more.
 btop.desktop
 kitty.desktop
+nvtop.desktop
 org.gnome.Nautilus.desktop
 org.gnome.Settings.desktop
 org.gnome.Software.desktop

@@ -8,11 +8,12 @@ Usa **OSTree con composefs**, conservando la cadena Secure Boot de Fedora:
 shim, GRUB y kernel oficial, sin UKI propio ni backend composefs nativo.
 SELinux es permisivo solo en la ISO instaladora; Gniri instalado debe usar Enforcing.
 
-Incluye Kitty, Waybar, Fuzzel, Mako, Zathura, Fastfetch, vi, Zsh/Starship,
+Incluye Kitty, Waybar, Fuzzel, Mako, Zathura, Fastfetch, vi/Vim, Zsh/Starship,
 JetBrainsMono Nerd Font, Tailscale, Podman, Distrobox y QEMU/KVM con virt-manager.
 Preparado para equipos AMD/Intel modernos, Wi-Fi, audio USB/Bluetooth, Wacom
 y controles de juegos con el kernel oficial Fedora. Incluye OpenVPN para GNOME,
 perfiles de energía TuneD y swap zram con Zstandard nivel 1.
+Añade diagnóstico gráfico con `glxinfo`, `amd-smi` y `nvtop`.
 
 Niri tiene [un único archivo básico](system_files/etc/niri/config.kdl):
 `Super+Enter` abre Kitty y `Super+D` el lanzador. Tus dotfiles tienen prioridad;

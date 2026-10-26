@@ -12,7 +12,9 @@ podman
 python3
 stow
 tar
+traceroute
 unzip
+vim-enhanced
 vim-minimal
 xz
 zsh

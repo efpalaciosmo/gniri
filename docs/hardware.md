@@ -4,6 +4,55 @@ Gniri incluye soporte para el equipo AMD/Realtek actual y equipos x86_64
 modernos de escritorio y portátiles. Conserva el kernel, módulos, firmware y
 políticas de audio de Fedora; la compatibilidad física depende del dispositivo.
 
+## Gráficos AMD/Intel y vídeo
+
+El driver AMD es el `amdgpu` del kernel Fedora con `amd-gpu-firmware` y Mesa:
+no hace falta instalar AMDGPU-PRO para OpenGL/Vulkan. `glxinfo` es una herramienta
+del paquete `glx-utils`, no un driver; su ausencia no demuestra falta de
+aceleración. Se añaden también `eglinfo`, `vulkaninfo`, `vainfo` y `nvtop`.
+Mesa OpenCL se instala explícitamente; no se incorpora todo ROCm/HIP.
+
+`amdsmi` instala el comando **`amd-smi`** y su módulo Python `amdsmi`. Las métricas
+disponibles dependen de la GPU y la versión AMD SMI; no todos los dispositivos
+Radeon ofrecen las funciones de las GPU de centro de datos. No se deben
+cambiar permisos globales de `/dev/dri` para resolver un error sin diagnosticarlo.
+
+Se incluyen libva y los drivers VA-API de Mesa/Intel, Intel Media SDK para
+generaciones compatibles y el runtime VPL moderno. Fedora 45 incluye los drivers
+VA-API de Mesa en `mesa-dri-drivers`. No se impone `LIBVA_DRIVER_NAME` globalmente:
+debe seleccionarse el driver adecuado para cada GPU, también en sistemas híbridos.
+
+```sh
+glxinfo -B             # requiere una sesión X11/Xwayland
+eglinfo               # puede listar backends no disponibles en la sesión
+vulkaninfo --summary
+vainfo
+amd-smi list
+amd-smi metric
+nvtop
+```
+
+Los runtimes/extensiones de Flatpak proporcionan sus propios códecs y bibliotecas
+gráficas. Los paquetes host no reemplazan esas extensiones. Se conserva
+OpenH264/Cisco y HEIF de Fedora, sin RPM Fusion ni promesa de H.264/HEVC acelerado
+en el host cuando Fedora excluye esos códecs.
+
+## Periféricos y llaves de seguridad
+
+Se incluyen herramientas/GStreamer libcamera, utilidades libimobiledevice para
+iPhone/iPad, `ratbagd`, `lm_sensors`, y reglas udev de OpenRGB y Solaar. Las reglas
+no instalan las aplicaciones gráficas ni ejecutan escaneos RGB automáticamente.
+La compatibilidad sigue dependiendo del dispositivo, sus permisos y, en su caso,
+el emparejamiento. `libxcrypt-compat` permite ejecutar programas antiguos
+compatibles; no garantiza compatibilidad completa con cualquier binario externo.
+
+`pam-u2f`, `pam_yubico` y `pamu2fcfg` están instalados, pero **no se modifica PAM
+ni authselect** ni se exige una llave para entrar. Registrar una llave y cambiar
+la política debe hacerse deliberadamente, conservando un método de recuperación.
+
+Los controles de juegos usan los drivers incluidos en el kernel Fedora.
+No se incluyen drivers externos para los adaptadores inalámbricos propietarios Xbox.
+
 ## Audio y diagnóstico
 
 PipeWire y WirePlumber gestionan audio HDA, HDMI/DisplayPort, USB y Bluetooth.

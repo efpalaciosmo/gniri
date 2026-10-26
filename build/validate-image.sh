@@ -59,7 +59,7 @@ fc-match 'JetBrainsMono Nerd Font' --format '%{family}\n' | grep -F 'JetBrainsMo
 [[ -s /usr/share/licenses/gniri-nerd-fonts/OFL.txt ]]
 niri validate --config /etc/niri/config.kdl
 [[ ! -e /usr/share/gniri/defaults && ! -e /usr/bin/gniri-user-setup ]]
-for command in distrobox fastfetch vi kitty niri-session dbus-update-activation-environment fuzzel mako waybar swayidle swaylock nautilus wpctl playerctl; do
+for command in distrobox fastfetch vi vim traceroute kitty niri-session dbus-update-activation-environment fuzzel mako waybar swayidle swaylock nautilus wpctl playerctl; do
     command -v "$command"
 done
 for module in uinput wacom kvm_amd amdgpu; do

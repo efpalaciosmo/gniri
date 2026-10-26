@@ -8,17 +8,27 @@ import shutil
 import subprocess
 import tempfile
 
-
 def require_file(path):
     assert Path(path).is_file(), f'Missing hardware integration file: {path}'
 
 
 for command in ('aplay', 'arecord', 'alsamixer', 'pw-cli', 'pw-dump', 'pw-top',
                 'pactl', 'nmcli', 'nmtui', 'iw', 'bluetoothctl', 'btmon',
-                'tuned-adm', 'zramctl', 'brightnessctl', 'openvpn'):
+                'tuned-adm', 'zramctl', 'brightnessctl', 'openvpn', 'glxinfo',
+                'eglinfo', 'vulkaninfo', 'vainfo', 'amd-smi', 'nvtop', 'sensors',
+                'cam', 'ideviceinfo', 'ratbagd', 'pamu2fcfg'):
     assert shutil.which(command), f'Missing hardware/diagnostic command: {command}'
 
 require_file('/usr/share/alsa/ucm2/ucm.conf')
+# Check libraries and dynamic drivers without requiring a display or GPU.
+for library in ('libva.so.2', 'libOpenCL.so.1', 'libheif.so.1', 'libopenh264.so.8'):
+    ctypes.CDLL(library)
+for driver in ('radeonsi_drv_video.so', 'iHD_drv_video.so'):
+    require_file('/usr/lib64/dri/' + driver)
+assert any(Path('/etc/OpenCL/vendors').glob('*.icd')), 'OpenCL ICD is required'
+subprocess.run(['python3', '-c', 'import amdsmi'], check=True)
+for module in ('pam_u2f.so', 'pam_yubico.so'):
+    ctypes.CDLL('/usr/lib64/security/' + module)
 assert any(Path('/usr/lib/firmware').rglob('sof-*.ri*')), 'SOF firmware is required'
 assert any(Path('/usr/lib/firmware').glob('iwlwifi-*.ucode*')), 'Intel Wi-Fi firmware is required'
 for firmware in ('rtw89/rtw8852c_fw-2.bin', 'rtl_bt/rtl8852cu_fw.bin'):
@@ -75,4 +85,4 @@ with tempfile.TemporaryDirectory(prefix='gniri-zram-') as temporary:
         assert (output / 'swap.target.wants/dev-zram0.swap').is_file()
         print(f'Zram generator: valid Fedora defaults + Zstandard level 1 with {ram_mib} MiB RAM')
 
-print('Audio, Wi-Fi, Bluetooth, OpenVPN, energy and zram image dependencies passed.')
+print('Graphics, peripherals, audio, network, energy and zram dependencies passed.')

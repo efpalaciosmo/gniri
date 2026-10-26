@@ -1,0 +1,4 @@
+# Install security-key tooling without changing PAM/authselect login policies.
+pam-u2f
+pam_yubico
+pamu2fcfg
