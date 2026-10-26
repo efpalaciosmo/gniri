@@ -1,151 +1,111 @@
-# Release gate
+# Pruebas y estado de validación
 
-Do not call this image production-ready until these checks pass. Container
-build validation is not a substitute for a boot test.
+**Una construcción, checksum o JSON no prueba preparación para producción.**
+Cada candidato necesita evidencia propia: revisión Git, digest de payload/base,
+SHA-256 de ISO, firmware/certificados de VM y logs revisados. `output/iso/build.json`
+registra entradas, pero declara la ISO sin validar. La [promoción](building.md)
+requiere evidencia y revisión; los resultados históricos no validan otro HEAD.
 
-## Artifact-specific evidence
+## Comprobaciones reproducibles
 
-Every release starts with a new evidence record. Checkboxes below are a test
-inventory, **not** proof that current HEAD passed. Historical results belong to
-the dated images in [validation.md](validation.md), not future builds.
-The source workflow requires ShellCheck/actionlint; the image workflow also
-runs nested Kitty/Niri, offline Flatpak and real containers/image signature
-acceptance/rejection. The ISO workflow runs the real installer regressions.
-Full bootc enforcement, GDM, Secure Boot and physical hardware remain separate
-gates. See [candidate promotion](releases.md): stable is never updated by a build.
-
-Record the source revision, payload digest, resolved Fedora base, ISO SHA-256,
-VM firmware/certificate configuration and test logs. `output/iso/build.json`
-binds the inputs to that ISO but deliberately declares it untested. Complete
-the generated evidence template only after running every check. Configure
-reviewers for GitHub's `stable` environment; do not use placeholder evidence.
-
-After `make build`, run `make check-desktop` to launch a test-only headless
-Weston, start the image's Niri with its real fallback configuration, and verify
-that Kitty maps a window in Niri. The test uses software rendering in an isolated
-container without host display/GPU access. Weston is not added to Gniri. This
-checks more than package presence, but does not validate GDM, logind, SELinux or
-the VM's DRM/3D setup.
-
-## Source and image
-
-- [x] `make check`: Bash/Python syntax, English minimal Niri configuration,
-      no personal dotfiles, weekly scheduling and safe update tests.
-- [ ] Release `make build REFRESH=1`: RPM resolution, upstream checksums, font discovery,
-      modules, desktop sessions and `bootc container lint`.
-- [ ] Release launcher review: Files, Settings, Software, Kitty, Zathura,
-      virt-manager and btop. Subsequent builds enforce the allowlist, now including nvtop.
-- [ ] No Firefox, unwanted GNOME applications, system remotes or Flatpak apps.
-- [ ] User session units pass `systemd-analyze verify`; no ordering cycles.
-- [ ] No `/usr/local/sbin` creation warning from tmpfiles on the regenerated ISO
-      or on first boot; `/usr` must remain read-only, not remounted as a workaround.
-- [ ] Confirm installed OSTree deployment uses composefs (mount information)
-      and retains Fedora shim/GRUB/kernel Secure Boot trust after an update.
-- [ ] Published digest passes BOTH Cosign verification and the installed
-      containers/image signature policy. Unsigned/wrong-key update must fail.
-
-## Installer and VM
-
-The installer-specific mount regression test runs the real Anaconda tasks on
-disposable tmpfs filesystems (not a disk). After building the installer image,
-use its Podman store (`sudo podman` for the rootful image made by `make iso`):
+Desde la raíz del repositorio:
 
 ```sh
-sudo podman run --rm --network=none --cap-add SYS_ADMIN \
-    --entrypoint python3 \
-    -v "$PWD/tests/installer-mount-smoke.py:/run/installer-mount-smoke.py:ro" \
-    localhost/gniri-installer:latest /run/installer-mount-smoke.py
+make check
+make build REFRESH=1
+make check-desktop
+sudo make check-installer  # Tras generar el instalador rootful con make iso.
 ```
 
-This tests separate home/var and EFI mount ordering, not partitioning, SELinux
-labeling, account login or boot. It does not replace the checks below.
+`make check` comprueba sintaxis y ejecuta unittest; usa Niri/ShellCheck/actionlint
+si están instalados. CI instala y exige los dos linters. `check-desktop` usa
+Weston/software rendering en un contenedor desechable sin GPU/display del host;
+confirma una ventana Kitty en Niri, no GDM, logind, SELinux ni DRM físico.
 
-The finalizer regression uses real OSTree deployments and BLS entries on tmpfs,
-with and without a separate `/boot`. It reproduces the read-only boot failure,
-checks that failed writes retain `fstab`, then checks successful migration,
-boot-argument readback, repeated console arguments and idempotency:
+`check-installer` ejecuta tareas reales Anaconda/OSTree sobre tmpfs: layouts de
+home/var/EFI y `/boot`, readback de argumentos, preservación de `fstab` tras fallo
+e idempotencia. No usa particionador ni discos. `label=disable` afecta solo al
+contenedor de prueba, no al modo SELinux del sistema instalado.
+
+Regresor Flatpak sin red:
 
 ```sh
-sudo podman run --rm --network=none --cap-add SYS_ADMIN \
-    --security-opt label=disable --entrypoint python3 \
-    -v "$PWD:/src:ro" localhost/gniri-installer:latest \
-    /src/tests/installer-finalize-smoke.py
+podman run --rm --network=none --entrypoint bash \
+  -v "$PWD/tests/flatpak-smoke.sh:/run/flatpak-smoke.sh:ro" \
+  localhost/gniri:development /run/flatpak-smoke.sh
 ```
 
-The security-label override applies only to this disposable test container's
-repository mount; it does not change the installer or installed SELinux mode.
+CI prueba además el precheck real de políticas offline y el cliente
+containers/image contra manifests firmados, sin firma y de clave incorrecta.
+Un error DNS/autenticación no cuenta como rechazo de firma. El precheck offline
+**no** sustituye la prueba de actualización/rechazo con bootc en una VM arrancada.
 
-- [ ] Build ISO with the current `image-builder` flow, not a deprecated action.
-- [ ] `make iso` completes locally without GitHub credentials or publication;
-      embedded development payload installs with networking disconnected.
-- [ ] Boot the ISO in UEFI with Secure Boot enabled and Fedora-compatible
-      enrolled certificates. Do not substitute public test keys.
-- [ ] Installer passes the initial SELinux/PID 1 freeze; SELinux is enabled
-      in permissive mode only in the installer. Installed Gniri is Enforcing.
-- [ ] Check that Anaconda requires user confirmation for disk changes.
-- [ ] Offline installation, account creation, first boot and fresh user login.
-- [ ] Btrfs with a separate `home` subvolume: the chosen user's home is on that
-      subvolume, exists through BOTH `/home/$USER` and `/var/home/$USER`, has the
-      right owner/SELinux label, and remains writable after a reboot. Also test
-      a layout without a separate home mount. See [diagnosis and recovery](installer-troubleshooting.md).
-- [ ] Installer initramfs has `/.buildstamp`; native UEFI does not request the
-      BIOS-only `edd` driver from either Anaconda hook. BIOS support remains.
-- [ ] Installer `IsFinal` matches the base's `RELEASE_TYPE`; stable bases do not
-      show a forced pre-release label, while development bases retain the warning.
-- [ ] The actual Anaconda bootc deployment command includes `--skip-finalize`;
-      target `/boot` remains writable through configuration and the finalizer.
-- [ ] DHCP, DNS and HTTPS work on the host's libvirt NAT network, not just QEMU
-      user networking; verify host firewall rules without disabling protection.
-- [ ] OCI payload installs with 4–6 GiB guest RAM and the live overlay's default
-      size: no manual remount, RAM-sized layer spool or `container_images_*`
-      failures in `/var/tmp`. Measure peak memory; this is not yet a tested minimum.
-- [ ] Installed system boots with Secure Boot enabled; `mokutil --sb-state`.
-- [ ] Both GDM sessions work and session selection is remembered.
-- [ ] Kitty creates a window in both GNOME and Niri; check Niri's user journal
-      on a login failure. Container dependency checks do not prove GDM/DRM works.
-- [ ] The resolved Fedora release's and GNOME backgrounds appear in GNOME's background chooser.
-- [ ] Fresh Niri login uses `/etc/niri/config.kdl`; user Flathub only.
-- [ ] An existing `~/.config/niri/config.kdl` takes precedence without copying.
-- [ ] Existing configs/Stow links survive login and an image update unchanged.
-- [ ] Login still works without Internet; Flathub provisioning retries later.
-- [ ] Fresh user Flathub registration succeeds offline with GPG verification;
-      no apps or system remotes appear after boot. Container regression:
-      `podman run --rm --network=none --entrypoint bash -v "$PWD/tests/flatpak-smoke.sh:/run/flatpak-smoke.sh:ro" localhost/gniri:development /run/flatpak-smoke.sh`.
-- [ ] `systemd-remount-fs.service` succeeds after installation. `/etc/fstab`
-      must not attempt to remount logical `/` with physical filesystem options;
-      the chosen root subvolume/compression/options remain in `rootflags=`.
-- [ ] GNOME and Niri: audio, networking, Bluetooth, keyring and polkit prompts.
-- [ ] Flatpak file chooser, screen sharing and clipboard work in both sessions.
-- [ ] Idle lock and lock-before-suspend work; no unlocked flash after resume.
-- [ ] Correct image tag/registry after install; update signature enforcement.
-- [ ] Sunday timer and missed-run catch-up stage without restarting the VM.
-- [ ] A failed network/signature check records failure; at most four attempts
-      occur within two hours. A rollback/source-change/pause is skipped without retry.
-- [ ] Manual `gniri-stage-update` uses the immutable strict policy even if the
-      caller sets `CONTAINERS_POLICY_JSON`; ordinary Podman/Distrobox pulls still work.
-- [ ] Manual reboot enters new deployment; rollback restores previous system.
-- [ ] `/home`, libvirt guests and Tailscale state survive update and rollback.
-- [ ] Interrupted update/full-disk tests preserve a bootable deployment; backup
-      restoration to a different disposable disk works. See [recovery.md](recovery.md).
+## Gate por candidato
 
-## Physical AMD workstation
+Esta lista es un inventario, no resultados ya obtenidos:
 
-- [ ] RX 9070 XT: amdgpu, RADV/Vulkan, OpenGL, monitors and suspend/resume.
-- [ ] `glxinfo -B`, `vulkaninfo --summary`, `vainfo`, `nvtop` and `amd-smi` on real
-      AMD/Intel hardware. Verify camera capture and OpenCL device enumeration.
-- [ ] Wacom: exact model, USB/Bluetooth, pen pressure, output mapping and buttons
-      in both GNOME and Niri; test in the intended note-taking application.
-- [ ] Controllers: each USB, Bluetooth and wireless receiver model, Steam Input
-      and Proton via a user-installed Steam Flatpak. Xbox proprietary wireless
-      adapters may require out-of-tree drivers; they are not silently included.
-- [ ] virt-manager: only the authorized account has passwordless system access.
-- [ ] x86 KVM guest with NAT, UEFI, virtual TPM and virtio 3D/OpenGL.
-- [ ] ARM32/ARM64 guest with TCG and ARM firmware.
-- [ ] Deliberately created Ethernet bridge; no network loss. Ordinary Wi-Fi
-      station interfaces usually cannot be bridged without additional support.
-- [ ] SELinux remains enforcing and firewalld enabled.
+- [ ] **Imagen:** construcción fresca, checksums upstream, lint fatal, comparación
+  de repacking, módulos/firmware, sesiones, fuentes y allowlist. Sin navegador,
+  aplicaciones Flatpak ni remotos de sistema. Unidades verificadas sin ciclos;
+  `/usr/local/sbin` existe sin errores tmpfiles ni remount de `/usr`.
+- [ ] **ISO/offline:** receta actual sin credenciales GitHub, payload OCI y una
+  única ISO/checksum/metadatos nuevos. Anaconda pide confirmación de discos,
+  crea cuenta y completa primer arranque offline. Mide memoria pico con 4–6 GiB;
+  ese rango no es todavía un mínimo garantizado.
+- [ ] **Montajes:** prueba home separado y sin separar, además de var/EFI. Hogar
+  visible por `/home/$USER` y `/var/home/$USER`, propietario/etiqueta correctos y
+  escritura tras reboot. `systemd-remount-fs` correcto, `/` y `/sysroot` de solo
+  lectura; opciones físicas conservadas en `rootflags=`. Deployment con composefs.
+- [ ] **Arranque seguro:** ISO e instalación arrancan con Secure Boot y certificados
+  Fedora (no claves públicas de prueba); repite tras actualización y rollback.
+  Instalador SELinux permisivo, destino Enforcing. Initramfs con `.buildstamp`,
+  EDD solo BIOS e `IsFinal` acorde con la base; Anaconda conserva `/boot` escribible
+  hasta completar configuración mediante `--skip-finalize`.
+- [ ] **Ambos escritorios:** login GDM y selección recordada, Kitty, fondos Fedora,
+  portales Flatpak (archivos/pantalla/clipboard), polkit, keyring, red, audio y
+  Bluetooth. Login offline, Flathub solo de usuario, sin apps preinstaladas;
+  prioridad de dotfiles/Stow y preservación tras actualización.
+- [ ] **Bloqueo/hardware:** idle y bloqueo antes de suspensión, sin flash desbloqueado
+  al reanudar. AMD/Intel real: OpenGL/Vulkan/VA-API/OpenCL, monitores y suspensión;
+  Wi-Fi/Bluetooth/reconexión, USB/audio/micrófono, cámara, Wacom (presión/mapeo/botones)
+  y cada mando/receptor/Steam Input. No se asume soporte Xbox externo al kernel.
+- [ ] **Confianza/actualización:** digest correcto pasa Cosign **y** la política
+  instalada. El helper bootc rechaza unsigned/wrong-key sin cambiar deployments,
+  ignora una política insegura del entorno, respeta origen/pausa/rollback y deja
+  funcionar Podman/Distrobox. El timer y catch-up preparan sin reiniciar; fallos
+  registran estado/reintentos limitados. Reboot manual entra en el nuevo deployment.
+- [ ] **Recuperación:** rollback restaura el sistema y preserva hogares, libvirt y
+  Tailscale; no se vuelve a preparar el digest defectuoso. Ensaya interrupción,
+  disco lleno y restauración de backup solo en discos desechables.
+- [ ] **Virtualización/red:** cuenta autorizada es la única con acceso sin contraseña;
+  KVM x86 con NAT/UEFI/TPM/virtio 3D y ARM32/64 con TCG/firmware. DHCP/DNS/HTTPS
+  funcionan en libvirt NAT, no solo en red QEMU de usuario. Puentes deliberados
+  sin perder red; SELinux Enforcing y firewalld activos.
 
-The ISO workflow runs manually and uploads 30-day artifacts, not public
-releases. Archive reviewed evidence and tested artifacts durably before promotion.
-GitHub-hosted runners have limited disk space; measure image/ISO
-size before scheduling ISO generation or choosing a larger/self-hosted runner.
+Registra dentro de la VM `mokutil --sb-state`, `getenforce`, `systemctl --failed`,
+`bootc status`, `findmnt` y journals pertinentes. No desactives protecciones para
+hacer pasar las pruebas. Conserva evidencia duradera/redactada, no solo cachés
+locales o artefactos Actions temporales; no marques `pass` sin ejecutar el ensayo.
+
+## Último registro conocido: 2026-10-25
+
+Validación del working tree basado en `fad8ad8`, **no una release**:
+
+- Fedora 44 estable, base x86_64
+  `sha256:5e7fcb515bdfbe6e6f83e322ab221eefada34db7d12773a054f2b1b11160cdd6`.
+  Bootc 1.17.1, OSTree 2026.4, Niri 26.04 y kernel 7.2.11-200.fc44.
+- Pasaron 100 unit tests, Niri, ShellCheck/actionlint, construcción y 14 checks
+  lint bootc (un skip upstream). El repacking comparó 92,529 rutas y produjo
+  `3c40558200daed66f0c020d32f0ec03dbdb309de2bb84db19f48449c8f85d41a`
+  (128 capas; 2,122,506,663 bytes gzip). No implica ahorro garantizado por actualización.
+- Pasaron Kitty/Niri anidado, Flathub offline, pausa del updater, unidades y
+  regresiones reales tmpfs Anaconda 44.30-2/OSTree. El cliente offline reprodujo
+  el error de default inseguro y pasó ese precheck con la política estricta;
+  después falló por DNS, como se esperaba sin red.
+- **Pendientes:** ISO privilegiada/fresh install, Secure Boot, GDM, hardware,
+  actualización/rollback bootc con registro real y restauración de backup.
+  No se publicó, firmó ni promovió una imagen. La ISO del 19 de octubre quedó
+  intacta y no representa estos cambios. Logs locales: `/tmp/opencode/gniri-*.log`.
+
+Los diagnósticos antiguos y sus detalles permanecen en el historial Git, no como
+guías vigentes ni evidencia para futuros candidatos.

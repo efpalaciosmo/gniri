@@ -1,126 +1,174 @@
 # Uso y recuperación
 
-## Aplicaciones y cuentas
+## Escritorio y dotfiles
 
-GDM ofrece GNOME y Niri, con Niri como preferencia inicial. No se modifica tu
-shell de inicio de sesión ni se crean `.zshrc` o configuraciones de Starship.
-Para personalizar el escritorio, consulta [dotfiles.md](dotfiles.md).
+GDM ofrece GNOME y Niri y recuerda la selección de cada usuario. Niri usa
+[`/etc/niri/config.kdl`](../system_files/etc/niri/config.kdl) solo si no existe
+`$XDG_CONFIG_HOME/niri/config.kdl` o `~/.config/niri/config.kdl`. El respaldo está
+en inglés: `Super+Enter` abre Kitty; `Super+D`, Fuzzel; `Super+Alt+L`, swaylock.
+Incluye Waybar/Mako, agente polkit y bloqueo a los cinco minutos/antes de suspender.
 
-Flathub se añade **como usuario** en segundo plano al entrar en la sesión.
-El descriptor oficial y su clave GPG van dentro de la imagen, verificados por
-SHA-256: registrar el remoto no requiere descargar el descriptor al iniciar.
-Flatpak puede advertir que no puede actualizar metadatos sin red; eso no impide
-que el remoto quede registrado. No se instalan aplicaciones ni se bloquea el
-escritorio. El aprovisionador de remotos Fedora del RPM queda enmascarado.
+No se copian dotfiles, temas ni scripts personales al entrar; tampoco se cambia
+el shell ni se configura Starship automáticamente. Para partir del respaldo:
+
+```sh
+mkdir -p ~/.config/niri
+cp --no-clobber /etc/niri/config.kdl ~/.config/niri/config.kdl
+```
+
+Puedes usar enlaces Stow revisados, no un playbook de instalación de otra distro.
+Tu configuración reemplaza el respaldo completo: debe definir también procesos
+de inicio y bloqueo. Los archivos personales de versiones antiguas no se borran.
+
+## Aplicaciones y virtualización
+
+Flathub se registra como usuario en segundo plano, con descriptor/clave incluidos
+y verificados; no instala aplicaciones. Una advertencia de metadatos sin red es
+esperable. El remoto de sistema debe estar vacío en una instalación nueva.
 
 ```sh
 flatpak remotes --user
-flatpak remotes --system  # Vacío en una instalación nueva.
+flatpak remotes --system
 flatpak install --user flathub ID_DE_LA_APLICACION
 sudo tailscale up
 ```
 
-El comando es `flatpak remotes --user`, no `flatpak --remotes`. Si falta Flathub:
-
-```sh
-systemctl --user status gniri-flathub-user.service
-journalctl --user -b -u gniri-flathub-user.service
-systemctl --user restart gniri-flathub-user.service
-```
-
-Las instalaciones anteriores pueden conservar el remoto de sistema `fedora`;
-no se borra automáticamente porque podría tener aplicaciones del usuario.
-Revisar primero `flatpak list --system --columns=application,origin`. Solo si
-ya no se usa, retirarlo deliberadamente con
-`sudo flatpak remote-delete --system fedora` (sin `--force`).
-
-Distrobox está incluido junto a Podman. No se crean contenedores ni se descargan
-imágenes automáticamente: `distrobox create` necesita red para obtener su imagen
-si todavía no está en el almacén local.
-
-## Virtualización
-
-Autoriza deliberadamente una cuenta local:
+Si falta Flathub, revisa `journalctl --user -b -u gniri-flathub-user.service` y
+reinicia esa unidad. Un remoto Fedora heredado no se elimina automáticamente:
+comprueba primero `flatpak list --system --columns=application,origin`; solo si
+no se usa, retíralo con `sudo flatpak remote-delete --system fedora`, sin `--force`.
+Podman/Distrobox no crean ni descargan contenedores hasta solicitarlos.
 
 ```sh
 sudo gniri-setup-virtualization "$USER"
+# Cierra la sesión por completo y vuelve a entrar.
+virsh -c qemu:///system list --all
 ```
 
-Añade la cuenta a `libvirt`, establece una regla polkit específica y activa
-la red NAT. Cierra la sesión por completo y vuelve a entrar; comprueba
-`virsh -c qemu:///system list --all` sin `sudo`. Es un permiso elevado de
-administración del anfitrión. Seleccionar otra cuenta sustituye la autorización
-sin contraseña anterior.
+Esto concede **administración elevada del anfitrión** a una cuenta local mediante
+libvirt/polkit y activa NAT. Seleccionar otra cuenta sustituye la autorización
+sin contraseña anterior. Para 3D: Virtio con aceleración y SPICE/OpenGL local.
+ARM32/64 usa TCG; x86 usa KVM. Los puentes se crean deliberadamente; una interfaz
+Wi-Fi en modo estación normalmente no admite un puente Ethernet convencional.
 
-Para 3D: vídeo **Virtio con aceleración 3D** y pantalla **SPICE con OpenGL**,
-local. ARM sobre AMD usa emulación TCG, más lenta que KVM. Los puentes se
-crean explícitamente con NetworkManager; no se cambia tu conexión de red.
+## Hardware y diagnóstico
 
-## Hardware, VPN y memoria
+Se conserva la pila Fedora: amdgpu/Mesa, firmware AMD/Intel/Wi-Fi, PipeWire y
+WirePlumber. Herramientas instaladas no equivalen a compatibilidad física probada.
 
-OpenVPN está integrado en Settings → Network → VPN, con importación de archivos
-de configuración. GNOME ofrece perfiles de energía mediante TuneD/tuned-ppd.
-La swap zram usa el tamaño adaptable Fedora, hasta 8 GiB, con Zstandard nivel 1;
-no necesita partición swap. Para audio USB/Bluetooth y las herramientas de
-diagnóstico, consulta [hardware.md](hardware.md).
+| Área | Comprobaciones |
+| --- | --- |
+| Gráficos | `glxinfo -B` (Xwayland), `eglinfo`, `vulkaninfo --summary`, `vainfo`, `nvtop`, `amd-smi list` |
+| Audio | `wpctl status`, `pactl list short sinks`, `pactl list short sources`, `aplay -l`, `arecord -l` |
+| Wi-Fi/red | `nmcli device status`, `nmcli connection show --active`, `journalctl -b -u NetworkManager` |
+| Bluetooth | `bluetoothctl show`, `rfkill list`, `journalctl -b -u bluetooth` |
+| Energía | `tuned-adm active`; perfiles GNOME mediante TuneD/tuned-ppd |
+| Memoria | `zramctl`, `swapon --show`, `cat /sys/block/zram0/comp_algorithm` |
+
+OpenVPN: Settings → Network → VPN → Import from file. No se inicia ningún túnel
+ni se incluyen credenciales. Bluetooth negocia perfiles/códecs según el equipo;
+usar el micrófono puede reducir calidad de reproducción. Revisa también
+`journalctl --user -b -u wireplumber -u pipewire` ante fallos de audio.
+
+Zram usa `min(ram, 8192)` MiB, prioridad 100 y `zstd(level=1)`; no reserva toda esa
+RAM al arrancar. No se configura swap de disco, writeback ni hibernación. Los
+ajustes locales van en `/etc/systemd/zram-generator.conf.d/`; un enlace
+`20-gniri.conf` a `/dev/null` allí desactiva solo el fragmento Gniri.
+
+No se fuerzan variables gráficas globales ni se relajan permisos de `/dev/dri`.
+VA-API, OpenCL y las métricas AMD dependen de la GPU; no se incluye ROCm completo.
+Los códecs/runtimes Flatpak son independientes del host; no hay RPM Fusion ni
+promesa de H.264/HEVC acelerado que Fedora excluya. Las reglas OpenRGB/Solaar no
+instalan sus GUI. Las herramientas U2F/Yubico no cambian PAM/authselect ni exigen
+llave para entrar. Adaptadores Xbox propietarios pueden necesitar drivers externos.
+Revisa nombres de conexiones y datos sensibles antes de compartir diagnósticos.
 
 ## Actualizaciones
 
-Las ISO creadas con `make iso` contienen una imagen local de desarrollo:
-no descargan actualizaciones de un registro inexistente. El calendario que
-sigue se aplica al instalar una imagen publicada con un origen GHCR válido.
-Para uso permanente, instala una ISO publicada/firmada/validada, no la de
-desarrollo. El origen Gniri `:stable` no cambia al pasar a una nueva versión
-Fedora; no se modifica automáticamente ningún sistema que apunte a otro origen.
-
-`bootc-fetch-apply-updates.timer` prepara actualizaciones **cada domingo a las
-10:00, hora local**, con hasta 30 minutos de retraso aleatorio. Se eliminan
-los disparadores por arranque y por intervalos del timer original. No hay
-comprobación diaria. `Persistent=true` recupera una ejecución perdida cuando
-el equipo vuelva a encenderse, aunque ya no sea domingo; no lo despierta.
-
-El helper selecciona `/usr/share/gniri/bootc-policy.json`, una política estricta
-separada de los valores generales de Podman/Distrobox. Primero se exige la
-política de firmas de Gniri. `bootc upgrade`, invocado por el helper, prepara el
-nuevo despliegue para el siguiente reinicio **decidido por ti**. No se usa
-`--apply`, reinicio automático, soft reboot automático ni `systemd-sysupdate`.
-Elegir frecuencia semanal retrasa la recepción de correcciones respecto a la
-frecuencia diaria; siempre puedes actualizar manualmente.
+Solo las instalaciones con origen GHCR publicado tienen actualizaciones; la ISO
+local de desarrollo no tiene registro. Los equipos siguen `gniri:stable`, no el
+tag base Fedora. El domingo a las 10:00 local se prepara una actualización, con
+hasta 30 minutos de retraso. `Persistent=true` recupera ejecuciones perdidas al
+encender, sin despertar el equipo. **Nunca se reinicia automáticamente.**
 
 ```sh
-bootc status
+gniri-stage-update --status
+sudo gniri-stage-update
 systemctl list-timers bootc-fetch-apply-updates.timer
 journalctl -u bootc-fetch-apply-updates.service
-gniri-stage-update --status
-sudo gniri-stage-update  # Mismas comprobaciones que el timer; no reinicia.
 ```
 
-GNOME Software gestiona aparte las actualizaciones de aplicaciones Flatpak.
-El timer del sistema no reinicia tus máquinas virtuales.
-No uses `bootc upgrade` directamente como ruta habitual: omite el helper que
-selecciona la política estricta y comprueba el origen/rollback/pausa.
+Usa este helper, no `bootc upgrade` directamente: selecciona la política estricta
+y comprueba origen, rollback y pausa. Los fallos se reintentan cada 15 minutos,
+con límite de cuatro intentos dentro de dos horas; las omisiones deliberadas no.
+El resultado, última comprobación correcta y digest preparado se guardan en
+`/var/lib/gniri/updates/status.json`. Un éxito no demuestra que el nuevo escritorio
+funcione. No hay notificación gráfica: revisa el estado si falla la comprobación
+semanal. GNOME Software gestiona aparte las aplicaciones Flatpak.
 
-Una ejecución fallida se reintenta cada 15 minutos, hasta cuatro intentos
-dentro de dos horas. No se añade una comprobación diaria. Las pausas, imágenes
-locales, orígenes cambiados y rollback pendiente son omisiones deliberadas y
-no se reintentan. El resultado y la última comprobación correcta quedan en
-`/var/lib/gniri/updates/status.json`; un éxito significa comprobación de firma,
-no que el nuevo escritorio ya haya sido probado. Revisa `--status` y el journal
-si no se ha completado la comprobación semanal; no hay notificación gráfica.
-
-## Rollback
+## Rollback y copias
 
 ```sh
 sudo systemctl disable --now bootc-fetch-apply-updates.timer
-sudo systemctl stop bootc-fetch-apply-updates.service  # Cancela también reintentos.
+sudo systemctl stop bootc-fetch-apply-updates.service
 sudo install -D -m 0644 /dev/null /etc/gniri/updates-paused
 sudo bootc rollback
 # Reinicia manualmente cuando hayas cerrado tu trabajo.
 ```
 
-También puedes elegir el despliegue anterior en GRUB. Mantén el timer
-desactivado hasta resolver el fallo para que no prepare de nuevo la versión
-problemática. Al resolverlo, elimina deliberadamente `/etc/gniri/updates-paused`,
-ejecuta `sudo systemctl reset-failed bootc-fetch-apply-updates.service` y vuelve
-a habilitar el timer. No vuelvas a preparar un digest que ya sabes que falla.
-Consulta [copias, GRUB y recuperación](recovery.md): rollback no restaura tus datos.
+También puedes elegir el deployment anterior en GRUB o usar una TTY si falla GDM.
+Tras arrancar una versión antigua, detén timer y servicio: puede no conocer el
+marcador nuevo. No prepares otra vez el digest fallido. Cuando haya uno validado,
+retira deliberadamente `/etc/gniri/updates-paused`, ejecuta
+`sudo systemctl reset-failed bootc-fetch-apply-updates.service` y habilita el timer.
+
+**Rollback no restaura datos mutables.** Antes de migrar o actualizar:
+
+- Verifica un destino separado/cifrado con `findmnt`/`lsblk`; guarda una copia fuera
+  del equipo y prueba descifrado/restauración en otro disco o VM.
+- Copia hogares/dotfiles, datos Flatpak/containers y estado necesario de servicios
+  bajo `/var/lib` (puede contener secretos). Revisa `/etc` selectivamente; no lo
+  sobrescribas completo al restaurar. Detén servicios o usa backups consistentes.
+- Apaga las VM antes de copiar discos e incluye pools personalizados, XML,
+  TPM y NVRAM; copiar una VM activa no garantiza consistencia.
+- Preserva propietarios, ACL, xattrs y enlaces; GNU tar admite
+  `--acls --xattrs --selinux --numeric-owner`. Usa `umask 077`, verifica checksums
+  y prueba archivos, enlaces Stow, VM y SELinux Enforcing tras restaurar.
+
+Si GRUB falla, usa un medio Fedora firmado de recuperación sin formatear discos.
+Si falta espacio, identifica `/boot`, `/var` y raíz con `df`, `du` y `findmnt`:
+no borres `/ostree` ni `/sysroot`, ni hagas `/usr` escribible como arreglo.
+
+## Problemas conocidos del instalador
+
+| Síntoma | Diagnóstico y precaución |
+| --- | --- |
+| `container_images_*: no space left on device` | Una ISO antigua puede reconstruir capas en el overlay live; regenera la ISO con payload OCI, no aumentes RAM/remountes `/run` como solución. El mínimo de RAM sigue pendiente de medición. |
+| `systemd-remount-fs` / `overlay: No changes allowed in reconfigure` | El finalizador migra opciones físicas a `rootflags=` y guarda `fstab.gniri-before-rootflags`; no borres la entrada `/` de una instalación antigua sin verificar `root=`/`rootflags=` y tener copia. |
+| `mkdir(boot/loader.0): Read-only file system` | Anaconda necesita `--skip-finalize` hasta completar configuración. Regenera el instalador; no hagas escribible permanentemente el sistema instalado. |
+| `.buildstamp` / `edd` en UEFI | La receta genera metadatos e initramfs y solicita EDD solo en BIOS. `IsFinal` describe la base, no certifica preparación de Gniri. |
+| DHCP falla con enlace activo | Comprueba leases/NAT y logs del firewall del anfitrión; que funcione con red de usuario QEMU no prueba `virbr0`. Limita cualquier permiso a DHCP/DNS/routing del puente; no desactives el firewall. |
+
+Las nuevas ISO no reparan automáticamente instalaciones antiguas. `/home` enlaza
+a `/var/home`; una regresión de Anaconda podía crear la carpeta bajo un montaje
+que luego la ocultaba. Para ese caso, primero copia el disco con la VM apagada.
+Desde una TTY del usuario afectado **dentro de Gniri**, no en el anfitrión:
+
+```sh
+sudo install -d -m 0700 /mnt/gniri-var
+sudo mount --bind /var /mnt/gniri-var
+sudo ls -ld "/mnt/gniri-var/home/$USER" /var/home
+```
+
+El bind debe ser **no recursivo**. Continúa solo si el origen es el hogar esperado
+y el destino no existe; no sobrescribas ni borres el origen:
+
+```sh
+sudo test ! -e "/var/home/$USER" && \
+    sudo cp -a --update=none-fail "/mnt/gniri-var/home/$USER" /var/home/
+sudo restorecon -RF "/var/home/$USER"
+sudo umount /mnt/gniri-var
+```
+
+Verifica usuario, propietario, montaje y escritura antes de volver a GDM. Si no
+coinciden esas condiciones, detente: no improvises con `rm`, `usermod` ni permisos 777.

@@ -8,12 +8,11 @@ Usa **OSTree con composefs**, conservando la cadena Secure Boot de Fedora:
 shim, GRUB y kernel oficial, sin UKI propio ni backend composefs nativo.
 SELinux es permisivo solo en la ISO instaladora; Gniri instalado debe usar Enforcing.
 
-Incluye Kitty, Waybar, Fuzzel, Mako, Zathura, Fastfetch, vi/Vim, Zsh/Starship,
-JetBrainsMono Nerd Font, Tailscale, Podman, Distrobox y QEMU/KVM con virt-manager.
-Preparado para equipos AMD/Intel modernos, Wi-Fi, audio USB/Bluetooth, Wacom
-y controles de juegos con el kernel oficial Fedora. Incluye OpenVPN para GNOME,
-perfiles de energía TuneD y swap zram con Zstandard nivel 1.
-Añade diagnóstico gráfico con `glxinfo`, `amd-smi` y `nvtop`.
+Incluye Kitty, Waybar/Fuzzel/Mako, Zathura, vi/Vim, Zsh/Starship, Tailscale,
+Podman/Distrobox y QEMU/KVM con virt-manager. Usa drivers Fedora para AMD/Intel,
+PipeWire, OpenVPN, TuneD y zram. Los [manifiestos](packages/) y la
+[lista de lanzadores](packages/visible-applications.allow) definen los paquetes;
+cada imagen guarda inventarios efectivos en `/usr/share/gniri/`.
 
 Niri tiene [un único archivo básico](system_files/etc/niri/config.kdl):
 `Super+Enter` abre Kitty y `Super+D` el lanzador. Tus dotfiles tienen prioridad;
@@ -46,9 +45,6 @@ descargas de actualización; `RECHUNK=0` permite omitir esa etapa al diagnostica
 > `make iso` es para desarrollo y no proporciona actualizaciones de registro.
 > Para el equipo principal, usar una imagen publicada, firmada y validada.
 
-- [Construcción, publicación e ISO](docs/building.md)
-- [Paquetes incluidos](docs/packages.md) · [uso y recuperación](docs/usage.md)
-- [Audio, energía, Wi-Fi, VPN y zram](docs/hardware.md)
-- [Dotfiles](docs/dotfiles.md) · [revisión técnica y fuentes](docs/architecture.md)
-- [Validación](docs/validation.md) · [pruebas pendientes](docs/testing.md)
-- [Canal estable y promoción](docs/releases.md) · [copias y recuperación](docs/recovery.md)
+- [Construcción, ISO, firmas y publicación](docs/building.md)
+- [Uso, dotfiles, hardware y recuperación](docs/usage.md)
+- [Pruebas, evidencia y límites de validación](docs/testing.md)

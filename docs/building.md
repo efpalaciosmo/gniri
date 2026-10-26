@@ -1,243 +1,140 @@
-# Construcción, publicación e ISO
+# Construcción y publicación
 
-## Imagen local
+## Base y paquetes
 
-Requisitos: Linux x86_64, Podman, Make, Python 3, Internet y espacio para varios
-GB de descargas, cachés e imágenes. La generación ISO necesita también `flock`
-(util-linux). No se instala ni se modifica el sistema operativo del anfitrión.
+El flujo soportado (`make` / `scripts/build-image.py`) resuelve el canal oficial
+[`fedora-bootc:latest`](https://quay.io/repository/fedora/fedora-bootc?tab=tags)
+a un digest Linux x86_64 en cada construcción. Sigue Fedora estable, no Rawhide:
+no hay que editar números de versión. El instalador reutiliza la base grabada
+en el payload; no resuelve otro `latest`. Esto no garantiza transiciones sin
+mantenimiento ni autoriza degradar una instalación desde una versión más nueva.
+
+Se conserva OSTree con composefs, raíz física de solo lectura y estado persistente
+en `/etc` y `/var`. La cadena firmware → shim → GRUB → kernel es la de Fedora;
+no hay UKI propio ni backend composefs nativo. `enabled=yes` no autentica por sí
+solo todo el filesystem. La compatibilidad Secure Boot necesita pruebas reales.
+
+Los [manifiestos RPM](../packages/) omiten grupos de escritorio y dependencias
+débiles. Los fondos se eligen desde `VERSION_ID`; los lanzadores se validan contra
+[su lista](../packages/visible-applications.allow). Tailscale usa su repositorio
+oficial; [las descargas upstream](../build/upstream.env) tienen versión/checksum
+fijos. Los RPM siguen repositorios vivos: no hay reproducibilidad bit a bit.
+
+## Construcción local
+
+Desde la raíz del repositorio: Linux x86_64, Podman, Make, Python 3, Internet y
+espacio para imágenes, cachés y staging de varios GB. La ISO requiere `sudo` y
+`flock` (util-linux). No se instala ni se rebasa el sistema del anfitrión.
 
 ```sh
 make check
-make build
-make build REFRESH=1  # Sin caché de capas; conserva cachés de descargas.
+make build              # Solo imagen: localhost/gniri:development.
+make iso                # Construye la imagen y genera la ISO local; pide sudo.
 ```
 
-Resultado: `localhost/gniri:development`, sin cuentas ni credenciales y sin
-actualizaciones desde un registro. No es un contenedor de aplicación: se
-distribuye para instalarlo como sistema bootc.
+| Opción | Uso |
+| --- | --- |
+| `REFRESH=1` | Reejecuta transacciones RPM sin borrar cachés de descarga; usar para releases. |
+| `RECHUNK=0` | Omite el repacking solo para diagnóstico. |
+| `BUILD_NETWORK=host` | Diagnóstico de DNS en contenedores; reduce aislamiento, no cambia el firewall. |
 
-**`make build` no genera una ISO:** termina al guardar la imagen de Podman.
-Para obtener el archivo instalador hay que ejecutar `make iso`.
-
-Los manifiestos RPM y las descargas caras se procesan antes que los metadatos
-y el overlay. Las capas y los cachés Podman se reutilizan localmente; los cachés
-de descarga no se incorporan al sistema final. No limpies el almacenamiento de
-Podman después de cada construcción si quieres reutilizarlos.
-
-Después de construir, `make build` reorganiza la imagen con Chunkah fijado por
-versión y digest. La herramienta se ejecuta sin red; la primera descarga de su
-contenedor sí necesita conexión. La imagen se importa y pasa lint bootc, revisión
-de su configuración OCI y comparación completa del contenido, permisos,
-propietarios, enlaces y atributos. La etiqueta se sustituye solo al terminar
-correctamente. Se mantienen 128 capas como máximo y el backend instalado
-OSTree con composefs. Se retira únicamente el repositorio OSTree embebido
-heredado de la construcción y sus dos etiquetas, siguiendo el contrato upstream.
-La comparación acepta el modo raíz 0555 de la imagen importada y la reorganización
-de hardlinks de archivos idénticos en `/usr` inmutable. Rechaza cambios de datos,
-otros permisos o atributos y nuevos alias entre archivos de configuración mutable.
-Separar hardlinks antiguos se admite: bootc copia `/etc` al desplegarlo.
-
-Para diagnosticar la construcción sin esa etapa:
-
-```sh
-make build RECHUNK=0
-```
-
-Para conservar una salida OCI y su informe, sin sustituir la etiqueta original:
+Chunkah se fija por digest y corre sin red. Antes de sustituir la etiqueta se
+comprueban lint bootc, configuración OCI, contenido, permisos, propietarios,
+enlaces y xattrs. Se admiten el modo raíz 0555 y deduplicación inmutable de `/usr`,
+no nuevos aliases de configuración mutable. Las firmas se generan **después**.
+No hay ahorro de descarga garantizado; cambiar de layout puede descargar todo.
+Para conservar un informe sin sustituir la imagen original:
 
 ```sh
 python3 scripts/rechunk-image.py localhost/gniri:development \
   --tag localhost/gniri:chunked --output .cache/rechunk-comparison
 ```
 
-La salida debe ser un directorio nuevo. Los archivos temporales predeterminados
-van a `.cache/` en disco, no a `/tmp` en RAM. Las firmas se generan después de
-la reorganización; CI firma y publica el digest final. La primera actualización
-desde imágenes antiguas puede necesitar descargar todas las capas nuevas.
-Véanse las [mediciones y pruebas](validation.md); no hay un ahorro fijo garantizado
-para todas las actualizaciones.
+El directorio de salida debe ser nuevo. No limpies Podman entre construcciones
+si quieres reutilizar capas y cachés.
 
-El canal oficial `quay.io/fedora/fedora-bootc:latest` se resuelve a un digest
-x86_64 antes de cada construcción. El instalador recibe el mismo digest desde
-la etiqueta OCI del payload: no vuelve a resolver `latest`. No se consultan
-números de versión ni el calendario de Fedora. La validación rechaza Rawhide y
-conserva las restricciones del backend, kernel y Secure Boot. Véase [releases.md](releases.md).
+## ISO e instalación
 
-Constructor ISO y descargas upstream fijados por digest/versión y SHA-256.
-Los RPM siguen los repositorios vivos de la versión estable elegida: no hay
-reproducibilidad bit a bit. Renovate puede proponer actualizaciones de digest
-y de acciones, pero las versiones/checksums en `build/upstream.env` requieren
-revisión explícita.
+`make iso` (`make iso-local`) no requiere GitHub, publicación ni Cosign, pero
+instala una imagen **de desarrollo sin origen de actualizaciones**. Para uso
+permanente usa una imagen publicada, firmada y [validada](testing.md).
 
-## ISO totalmente local, sin cuenta ni publicación
+Podman de usuario y root tienen almacenes separados: la receta transfiere el
+payload por una tubería y exporta un directorio OCI temporal en disco. Anaconda
+lee los blobs embebidos directamente, sin reconstruirlos en el `/var/tmp` live.
+El instalador está separado del escritorio y usa `image-builder bootc-generic-iso`.
+El staging se elimina al terminar y las construcciones ISO concurrentes se bloquean.
 
-Desde la raíz del repositorio, como usuario normal:
+Salidas: `output/iso/gniri-x86_64.iso`, `SHA256SUMS` y `build.json`. Los metadatos
+registran payload, base, constructor y revisiones del payload/instalador; **no
+certifican preparación para producción**. Una ejecución sin una única ISO nueva
+no se acepta por encontrar un archivo antiguo.
 
 ```sh
-make iso
-```
-
-`make iso-local` es equivalente. Construye `localhost/gniri:development`,
-transfiere la imagen al almacenamiento de Podman con privilegios y genera la
-ISO con el payload local embebido. Pedirá `sudo` para esas operaciones.
-**No necesitas GitHub Actions, cuenta GitHub, publicar en GHCR, Cosign ni
-claves propias de firma para esta prueba local.**
-
-Podman de usuario y `sudo podman` tienen almacenes separados; la receta los
-conecta mediante un archivo OCI transmitido por una tubería, sin guardar otra
-copia intermedia de varios GB en disco para esa transferencia. No intenta descargar `localhost/gniri` de un
-registro ni cambia permisos en el repositorio completo.
-
-Para componer el instalador, se exporta además un **directorio OCI** temporal
-bajo `output/`, en el disco de construcción, y se incorpora al squashfs de la
-ISO. Ese directorio de preparación se elimina al terminar, incluso si falla
-la construcción. Necesitas espacio adicional en disco durante esta fase.
-Anaconda lee sus blobs directamente mediante `oci:`, sin reconstruirlos en el
-`/var/tmp` de la sesión live. No hay que ampliar `/run`, cambiar sus límites ni
-asignar 10–12 GB de RAM para alojar una copia temporal de la imagen.
-
-La ISO se publica siempre como **`output/iso/gniri-x86_64.iso`**, junto con
-`output/iso/SHA256SUMS` y `output/iso/build.json`. El último registra base,
-payload, revisión, constructor y checksum; declara la ISO **sin validar**.
-El nombre incluye la arquitectura del sistema anfitrión
-soportado por Gniri (x86_64; no se ofrecen ISO ARM). Al terminar se muestra su
-ruta absoluta. Para verificarla desde la raíz del proyecto:
-
-```sh
-ls -lh output/iso/gniri-x86_64.iso
 (cd output/iso && sha256sum --check SHA256SUMS)
-```
-
-El constructor escribe primero en un directorio nuevo y solo publica el archivo
-si hay exactamente una ISO no vacía; una ISO anterior no puede hacer pasar una
-construcción sin salida. Su registro se guarda en **`output/iso-build.log`**.
-Si `make iso` falla en esa fase, revisa:
-
-```sh
 tail -n 80 output/iso-build.log
 ```
 
-Si ese registro no existe, el proceso no llegó al constructor ISO: revisa el
-error de `make`, la construcción del contenedor o la autenticación de `sudo`.
+Si no hay log, el fallo ocurrió antes del constructor: revisa Make, Podman o sudo.
+Para DNS, compara resolución en anfitrión y contenedor; prueba
+`make iso BUILD_NETWORK=host` solo si el anfitrión resuelve correctamente.
+No desactives TLS, firmas RPM ni el firewall para resolverlo.
 
-**Local no significa construcción sin Internet:** se descargan la base Fedora,
-RPM y herramientas públicas, incluido el contenedor de `image-builder` alojado
-en GHCR. No requiere autenticarse ni subir tu imagen. La instalación desde la
-ISO usa el payload incluido y está diseñada para funcionar sin red; el nuevo
-transporte OCI necesita una prueba completa en VM. Una construcción completamente desconectada no es un
-flujo soportado todavía.
+La instalación está diseñada para funcionar sin red; construir sí necesita
+descargas. Cuenta, contraseña, discos y particionado se eligen interactivamente:
+no hay borrado automático, contraseña predeterminada ni filesystem/cifrado impuesto.
+`--bootc-default-fs ext4` es metadato del constructor, no una orden de particionado.
+SELinux es permisivo **solo en el instalador**; el destino solicita Enforcing.
 
-Esta ISO de desarrollo no tiene un origen publicado del que descargar futuras
-actualizaciones; el actualizador de Gniri omite las comprobaciones de registro.
-Eso es independiente de Secure Boot: se conservan shim, GRUB y kernel Fedora,
-sin desactivarlo ni generar claves de prueba.
+## Firmas y publicación
 
-El entorno **instalador** usa SELinux activo en modo **permisivo**
-(`selinux=1 enforcing=0`), según la integración Anaconda/bootc. Esto no desactiva
-Secure Boot y no cambia el payload de escritorio: el Kickstart solicita
-`selinux --enforcing` para el sistema instalado. La construcción de Gniri
-comprueba su configuración Enforcing y rechaza argumentos que la debiliten.
-Después de instalar, verifica `getenforce`: debe devolver `Enforcing`.
+1. Genera claves con `cosign generate-key-pair`. Guarda la privada fuera del
+   repositorio; en `trust/` conserva **solo material público** (`cosign.pub`).
+   Configura los secretos GitHub `COSIGN_PRIVATE_KEY` (contenido cifrado) y
+   `COSIGN_PASSWORD`. Las firmas OCI autentican actualizaciones, no sustituyen Secure Boot.
+2. Haz público `ghcr.io/OWNER/gniri` para permitir actualizaciones sin credenciales
+   en el equipo. Crea el entorno GitHub **`stable` con revisores obligatorios**:
+   el YAML no configura por sí solo las reglas de protección.
+3. **Build and publish Gniri**, desde `main`, construye fresco, valida, repackea y
+   publica el candidato firmado `sha-COMMIT-RUN_ID-ATTEMPT`; **no escribe `:stable`**.
+   Se ejecuta por cambios de código, manualmente y los sábados a las 06:20 UTC.
+   Las pull requests no publican. CI comprueba el cliente real contra imágenes
+   firmadas, sin firma y con clave incorrecta; `policy-test-*` no son versiones instalables.
+4. Descarga `gniri-candidate-inventory`: contiene inventarios, metadatos, digest y
+   `validation.json` con resultados `untested`. Genera su ISO con **Build installer
+   ISO**, indicando `payload_digest`; vacío selecciona el `stable` actual. O usa:
 
-Si la ISO anterior se congela con denegaciones SELinux de `systemd[1]`, puedes
-confirmar el diagnóstico sin regenerarla: pulsa `e` sobre `Install Gniri` en
-GRUB, añade `selinux=1 enforcing=0` al final de la línea que empieza por `linux`
-y arranca con `Ctrl+X`. Es un cambio temporal para el instalador, no una solución
-para un sistema ya instalado. La receta nueva incorpora estos argumentos al
-generar otra ISO; la ISO existente no se modifica.
+   ```sh
+   make iso-published REFRESH=1 \
+     PAYLOAD_REF=ghcr.io/owner/gniri@sha256:DIGEST \
+     TARGET_REF=ghcr.io/owner/gniri:stable
+   ```
 
-### Si falla DNS dentro del contenedor
+   Ambos verifican Cosign antes de descargar el payload. El flujo local publicado
+   requiere Cosign en el `PATH` de root. El instalador apunta al futuro `:stable`;
+   desactiva las actualizaciones en la VM de candidatos antes de darle acceso al registro.
+5. Completa las [pruebas](testing.md), archiva logs redactados, ISO, checksum y
+   metadatos de forma duradera. Los artefactos ISO de Actions caducan a los 30 días;
+   no son releases. Para distribución pública, autentica también los checksums.
+6. Guarda el JSON completo y revisado en `release-evidence/NOMBRE.json`, mediante
+   commit/PR. Solo resultados realmente obtenidos para ese digest, revisión e ISO,
+   con URLs HTTPS duraderas. No incluyas claves, credenciales, datos personales ni discos VM.
+7. Ejecuta **Promote tested candidate to stable** desde `main`, indicando esa ruta.
+   Tras el gate y aprobación se verifican firma/revisión OCI y se copia **el mismo
+   digest**, sin reconstruir. El revisor debe leer la evidencia: un JSON no prueba
+   criptográficamente los ensayos. No hay actualización nueva hasta promover un candidato.
 
-Si DNF muestra `Could not resolve host` para todos los repositorios, comprueba
-primero que el anfitrión tiene conexión y resuelve esos nombres:
+La política general de contenedores conserva los valores Fedora más la regla
+Gniri. El updater usa `/usr/share/gniri/bootc-policy.json`, independiente y con
+`default: reject`; el modo estricto de bootc rechaza el default global inseguro
+aunque exista una regla firmada por repositorio. Podman/Distrobox no se restringen
+fuera del ámbito Gniri. Sigue la [ruta de actualización soportada](usage.md).
 
-```sh
-getent hosts mirrors.fedoraproject.org fedoraproject-updates-archive.fedoraproject.org
-```
-
-Si funciona en el anfitrión pero falla durante la construcción —en particular
-en la fase que usa `sudo podman`— prueba:
-
-```sh
-make iso BUILD_NETWORK=host
-```
-
-La opción se transmite también a través de `sudo`, tanto a la construcción del
-instalador como al contenedor `image-builder`. Usa la red del anfitrión en vez
-de la red privada de Podman. Es una opción de diagnóstico/recuperación para
-construcciones de confianza, no el valor por defecto: reduce el aislamiento de
-red de esos contenedores. No modifica `/etc/resolv.conf`, no impone DNS públicos
-ni desactiva TLS, firmas RPM o repositorios.
-
-Si tampoco funciona, compara la resolución dentro de un contenedor rootful
-con la del anfitrión antes de cambiar repositorios o paquetes. Una caché de
-paquetes no sustituye la conectividad necesaria para renovar metadatos.
-
-## Publicación opcional: GHCR y firma
-
-El workflow **Check Gniri** ejecuta `make check` en cada push y pull request,
-incluidos los cambios de documentación. No necesita secretos ni publica imágenes.
-Los workflows de construcción y publicación requieren la configuración siguiente.
-
-1. Crear el repositorio GitHub y habilitar Actions y GHCR.
-2. Ejecutar `cosign generate-key-pair` y proteger la clave privada.
-3. Añadir **solo** `trust/cosign.pub` al repositorio.
-4. Crear los secretos GitHub `COSIGN_PRIVATE_KEY` y `COSIGN_PASSWORD`.
-5. Configurar el entorno GitHub `stable` con revisores obligatorios.
-6. Hacer público `ghcr.io/<propietario-en-minúsculas>/gniri` para que el sistema
-    pueda actualizarse sin guardar credenciales GHCR.
-7. Ejecutar **Build and publish Gniri** desde `main`: publica solo un candidato
-   firmado, ejecuta escritorio/Flatpak y prueba el cliente real de firmas.
-8. Generar/probar su ISO por digest, registrar evidencia y ejecutar el workflow
-   separado **Promote tested candidate to stable**. Véase [releases.md](releases.md).
-
-Las pull requests y ramas de prueba no publican. En `main` hay construcción
-por cambios de código, ejecución manual y programación semanal: **sábado
-06:20 UTC**, antes de la ventana dominical de los equipos. Construir y firmar
-no actualiza `stable`; solo la promoción aprobada lo hace. Los relojes de publicación y del equipo son
-independientes: publicar una imagen no obliga a descargarla inmediatamente.
-
-Las ejecuciones programadas usan `--no-cache` para renovar los RPM aunque el
-digest base no haya cambiado. Los runners efímeros no conservan cachés entre
-trabajos. Consultar [trust/README.md](../trust/README.md) para las claves y la
-distinción entre firmas OCI y Secure Boot.
-
-## ISO desde una imagen publicada
-
-Después de publicar una imagen firmada, ejecutar **Build installer ISO** en
-GitHub Actions. El parámetro `payload_digest` permite probar un candidato antes
-de promoverlo; vacío selecciona `stable`. Crea ISO, SHA-256 y metadatos como artefactos durante 30 días;
-no publica una release. La generación sigue siendo manual.
-
-O generar localmente una ISO de esa versión publicada:
-
-```sh
-make iso-published \
-  PAYLOAD_REF=ghcr.io/owner/gniri@sha256:DIGEST \
-  TARGET_REF=ghcr.io/owner/gniri:stable
-```
-
-Este modo requiere Cosign en el `PATH` de root: verifica el digest contra
-`trust/cosign.pub` antes de descargarlo, también fuera de GitHub. La ISO de
-desarrollo sigue sin necesitar Cosign. Utiliza `REFRESH=1` para renovar también
-los RPM del instalador al preparar una release.
-
-Ambos caminos usan `image-builder` con privilegios y `bootc-generic-iso`, no la acción
-obsoleta `bootc-image-builder-action`. Anaconda vive en un contenedor instalador
-separado, nunca en la imagen de escritorio. Para las imágenes publicadas el
-payload se fija por digest y las actualizaciones apuntan a `stable`. La receta
-local, en cambio, incorpora `localhost/gniri:development` sin publicar nada.
-
-Cuenta, contraseña, discos y particionado se deciden interactivamente.
-**No se incluye borrado automático.** No se impone cifrado ni Btrfs.
-La cuenta debe crearse durante la instalación; no hay contraseña predeterminada.
-
-La llamada al constructor incluye `--bootc-default-fs ext4` porque image-builder
-exige ese metadato incluso para `bootc-generic-iso`. Es un respaldo para leer
-la imagen instaladora, no una instrucción de particionado: no se añade
-`autopart`, `--fstype` ni una configuración equivalente al Kickstart o al
-payload. El sistema de archivos del disco instalado sigue eligiéndose en Anaconda.
-
-**Pendiente:** generar y arrancar la ISO, comprobar Secure Boot con certificados
-Fedora y completar instalación, actualización y rollback. Un workflow válido no
-demuestra que su ISO arranque. Consultar [testing.md](testing.md).
+Para migrar una instalación local sin confianza de registro, la opción recomendada
+es copia/restauración verificada y reinstalación. Una migración in-place exige
+ensayo en copia desechable, clave obtenida por canal autenticado/fingerprint
+independiente, política temporal root-owned estricta por repositorio con
+`sigstoreSigned`/`matchRepository` y `use-sigstore-attachments: true`, verificación
+Cosign/containers-image y switch con enforcement. No basta añadir un flag ni
+aceptar firmas arbitrarias. La rotación requiere una transición verificable por
+la confianza anterior; perder la única clave exige recuperación autenticada.

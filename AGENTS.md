@@ -31,4 +31,4 @@ History uses concise imperative subjects, such as “Reduce peak disk usage whil
 ## Security & Configuration
 
 Commit only public signing material under `trust/`; keep private keys and credentials out of Git. Preserve Fedora Secure Boot trust, installed SELinux Enforcing, signed update verification, and user-owned dotfiles.
-Never promote a build directly to `stable`. Promotion requires artifact-specific reviewed evidence and the protected `stable` GitHub environment; see `docs/releases.md`.
+Never promote a build directly to `stable`. Promotion requires artifact-specific reviewed evidence and the protected `stable` GitHub environment; see `docs/building.md`.

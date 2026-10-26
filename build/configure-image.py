@@ -23,7 +23,7 @@ Path('/usr/local/sbin').mkdir(mode=0o755, parents=True, exist_ok=True)
 if reference.startswith('ghcr.io/'):
     public_key = Path('/run/gniri-build/trust/cosign.pub')
     if not public_key.is_file():
-        raise SystemExit('Publishing requires trust/cosign.pub; see trust/README.md.')
+        raise SystemExit('Publishing requires trust/cosign.pub; see docs/building.md.')
     (share / 'keys').mkdir(exist_ok=True)
     shutil.copyfile(public_key, share / 'keys/cosign.pub')
     repository = reference.rsplit(':', 1)[0]
