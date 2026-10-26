@@ -8,6 +8,10 @@ good_digest=${3:?Signed candidate digest required}
 [[ ${GITHUB_ACTIONS:-} == true ]]
 work=$(mktemp -d)
 trap 'rm -r -- "$work"' EXIT
+# Host Podman/Cosign logins are not inherited by the disposable container.
+# Keep credentials ephemeral and outside the image, including for private GHCR.
+printf '%s' "${REGISTRY_TOKEN:?Registry token required}" | sudo podman login ghcr.io \
+    --authfile "$work/auth.json" --username "${GITHUB_ACTOR:?GitHub actor required}" --password-stdin
 run_id="${GITHUB_RUN_ID:?}-${GITHUB_RUN_ATTEMPT:?}"
 for kind in unsigned wrong-key; do
     printf 'FROM %s\nLABEL gniri.policy-test="%s-%s"\n' "$source_image" "$run_id" "$kind" |
@@ -23,6 +27,7 @@ wrong_digest=$(cat "$work/wrong-key.digest")
 cosign sign --yes --new-bundle-format=false --use-signing-config=false \
     --registry-referrers-mode=legacy --key "$work/wrong-key.key" "$repository@$wrong_digest"
 sudo podman run --rm --network=host --entrypoint bash \
+    -v "$work/auth.json:/run/registry-auth.json:ro" \
     -v "$PWD/tests/signature-smoke.sh:/run/signature-smoke.sh:ro" \
     "$source_image" /run/signature-smoke.sh "$repository@$good_digest" \
     "$repository@$(cat "$work/unsigned.digest")" "$repository@$wrong_digest"

@@ -37,6 +37,8 @@ podman run --rm --network=none --entrypoint bash \
 
 CI prueba además el precheck real de políticas offline y el cliente
 containers/image contra manifests firmados, sin firma y de clave incorrecta.
+El contenedor recibe un authfile temporal de GHCR montado en solo lectura;
+los logins del host no se heredan y las credenciales no se incluyen en la imagen.
 Un error DNS/autenticación no cuenta como rechazo de firma. El precheck offline
 **no** sustituye la prueba de actualización/rechazo con bootc en una VM arrancada.
 
