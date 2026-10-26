@@ -87,6 +87,7 @@ class StableBaseTests(unittest.TestCase):
 class PromotionGateTests(unittest.TestCase):
     def evidence(self):
         return {'payload_digest': DIGEST, 'source_revision': REVISION, 'iso_sha256': 'c' * 64,
+                'candidate_run_id': '123', 'candidate_run_attempt': '1',
                 'checks': {name: {'result': 'pass', 'evidence': f'https://example.com/logs/{name}'}
                            for name in GATE['CHECKS']}}
 
@@ -95,7 +96,9 @@ class PromotionGateTests(unittest.TestCase):
 
     def test_other_images_sources_missing_iso_or_unperformed_tests_are_rejected(self):
         for field, value in (('payload_digest', 'sha256:' + 'd' * 64),
-                             ('source_revision', 'e' * 40), ('iso_sha256', '')):
+                             ('source_revision', 'e' * 40), ('iso_sha256', ''),
+                             ('candidate_run_id', ''), ('candidate_run_id', '../123'),
+                             ('candidate_run_attempt', '0')):
             record = self.evidence()
             record[field] = value
             with self.assertRaises(ValueError):

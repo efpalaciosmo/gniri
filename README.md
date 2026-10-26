@@ -40,6 +40,12 @@ make iso    # Local: no requiere cuenta GitHub ni publicar la imagen.
 La construcción reorganiza y valida las capas OCI para reducir tamaño y
 descargas de actualización; `RECHUNK=0` permite omitir esa etapa al diagnosticar.
 
+En GitHub, el pipeline de `main` publica un candidato firmado y genera su ISO
+x86_64 automáticamente. Tras pruebas reales y promoción aprobada, publica el mismo
+payload en `stable` y la ISO revisada en **Releases**, con checksums firmados.
+La [guía de construcción](docs/building.md#github-configuración-inicial) describe
+secretos, protecciones, artefactos y verificación de las partes de descarga.
+
 > **En desarrollo:** no instalar en el equipo principal hasta probar la ISO,
 > Secure Boot, actualizaciones y rollback en una VM.
 > `make iso` es para desarrollo y no proporciona actualizaciones de registro.

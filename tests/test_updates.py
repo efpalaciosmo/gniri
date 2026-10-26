@@ -68,7 +68,7 @@ class UpdateTests(unittest.TestCase):
     def test_builds_never_promote_stable(self):
         text = (ROOT / '.github/workflows/build.yml').read_text()
         guard = "github.event_name != 'pull_request' && github.ref == 'refs/heads/main'"
-        self.assertEqual(text.count(guard), 3)
+        self.assertEqual(text.count(guard), 4)
         self.assertIn('persist-credentials: false', text)
         self.assertNotRegex(text, r'podman push[^\n]+"\$IMAGE:stable"')
         promotion = (ROOT / '.github/workflows/promote.yml').read_text()

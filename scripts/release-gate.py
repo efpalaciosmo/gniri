@@ -20,6 +20,9 @@ def validate(record, digest, revision):
         raise ValueError('Evidence belongs to a different image or source revision')
     if not re.fullmatch(r'[a-f0-9]{64}', record.get('iso_sha256', '')):
         raise ValueError('Record the tested ISO SHA-256')
+    for field in ('candidate_run_id', 'candidate_run_attempt'):
+        if not re.fullmatch(r'[1-9][0-9]*', str(record.get(field, ''))):
+            raise ValueError(f'Record the exact GitHub Actions {field}')
     for name in CHECKS:
         check = record.get('checks', {}).get(name, {})
         if check.get('result') != 'pass' or not str(check.get('evidence', '')).startswith('https://'):
@@ -32,11 +35,15 @@ def main():
     parser.add_argument('--digest', required=True)
     parser.add_argument('--revision', required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--run-id', default='')
+    parser.add_argument('--run-attempt', default='')
+    parser.add_argument('--iso-sha256', default='')
     args = parser.parse_args()
     if args.action == 'template':
         record = {'payload_digest': args.digest, 'source_revision': args.revision,
-                  'iso_sha256': '', 'checks': {name: {'result': 'untested', 'evidence': ''}
-                                             for name in CHECKS}}
+                  'iso_sha256': args.iso_sha256, 'candidate_run_id': args.run_id,
+                  'candidate_run_attempt': args.run_attempt,
+                  'checks': {name: {'result': 'untested', 'evidence': ''} for name in CHECKS}}
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(record, indent=2) + '\n')
     else:

@@ -42,6 +42,13 @@ los logins del host no se heredan y las credenciales no se incluyen en la imagen
 Un error DNS/autenticación no cuenta como rechazo de firma. El precheck offline
 **no** sustituye la prueba de actualización/rechazo con bootc en una VM arrancada.
 
+El pipeline de `main` genera después la ISO del digest firmado y adjunta un
+`validation.json` con checksum, revisión y run/intento exactos, **sin marcar ensayos
+como aprobados**. Usa ese archivo para la evidencia revisada. La promoción descarga
+la ISO probada y rechaza otros bytes, metadatos, runs fallidos o procedentes de PR/forks.
+Los unit tests prueban estas guardas y el particionado/reensamblado de assets con
+bytes simulados; no crean por sí solos una release ni validan un arranque.
+
 ## Gate por candidato
 
 Esta lista es un inventario, no resultados ya obtenidos:

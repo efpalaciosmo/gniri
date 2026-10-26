@@ -1,6 +1,12 @@
 name: Build installer ISO
 
 on:
+  workflow_call:
+    inputs:
+      payload_digest:
+        description: Exact signed candidate digest from the successful image job
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       payload_digest:
@@ -13,15 +19,16 @@ permissions:
   packages: read
 
 concurrency:
-  group: installer-iso
+  group: installer-iso-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
   iso:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Install required validators
@@ -54,18 +61,42 @@ jobs:
           fi
           [[ $digest =~ ^sha256:[a-f0-9]{64}$ ]]
           cosign verify --new-bundle-format=false --key trust/cosign.pub "$image@$digest"
-          sudo env "PATH=$PATH" bash scripts/build-iso.sh "$image@$digest" "$image:stable" '' 1
+          sudo env "PATH=$PATH" "DOCKER_CONFIG=$HOME/.docker" \
+            bash scripts/build-iso.sh "$image@$digest" "$image:stable" '' 1
           sudo chown -R "$(id -u):$(id -g)" output/iso
           cd output/iso
           sha256sum --check SHA256SUMS
       - name: Real installer mount and finalization regressions
         run: sudo make check-installer
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - name: Record candidate identity for human validation
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          digest=$(jq -er .payload_reference output/iso/build.json)
+          digest=${digest##*@}
+          revision=$(jq -er .source_revision output/iso/build.json)
+          checksum=$(cut -d ' ' -f 1 output/iso/SHA256SUMS)
+          python3 scripts/release-gate.py template --digest "$digest" --revision "$revision" \
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --iso-sha256 "$checksum" \
+            --output output/iso/validation.json
+          printf '### Installer candidate (not a release)\n\nPayload: ghcr.io/%s/gniri@%s\n\nISO SHA-256: %s\n\nDownload gniri-installer-x86_64-%s from this run. Complete its validation.json with real test evidence before promotion.\n' \
+            "${OWNER,,}" "$digest" "$checksum" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: gniri-installer-x86_64
+          name: gniri-installer-x86_64-${{ github.run_attempt }}
           path: |
             output/iso/gniri-x86_64.iso
             output/iso/SHA256SUMS
             output/iso/build.json
+            output/iso/validation.json
+          if-no-files-found: error
+          retention-days: 30
           compression-level: 0
+      - name: Preserve ISO builder logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gniri-iso-logs-${{ github.run_attempt }}
+          path: output/iso-build.log
+          if-no-files-found: ignore
           retention-days: 30
