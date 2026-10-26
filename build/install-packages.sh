@@ -2,6 +2,9 @@
 set -euo pipefail
 
 mapfile -t packages < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' /run/gniri-build/packages/*.txt)
+source /usr/lib/os-release
+[[ $ID == fedora && $VERSION_ID =~ ^[0-9]+$ && ${RELEASE_TYPE:-} == stable ]]
+packages+=("f${VERSION_ID}-backgrounds-gnome")
 dnf5 -y --refresh --setopt=keepcache=True --setopt=install_weak_deps=False upgrade
 dnf5 -y --setopt=keepcache=True --setopt=install_weak_deps=False install "${packages[@]}"
 

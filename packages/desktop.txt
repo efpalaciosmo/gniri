@@ -5,7 +5,7 @@ adwaita-sans-fonts
 alsa-ucm
 alsa-utils
 dbus-tools
-f45-backgrounds-gnome
+# Release-specific Fedora backgrounds are selected from the base's VERSION_ID.
 gdm
 gnome-backgrounds
 gnome-control-center

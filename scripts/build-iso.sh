@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-if (( EUID != 0 )) || (( $# < 2 || $# > 3 )); then
+if (( EUID != 0 )) || (( $# < 2 || $# > 4 )); then
     printf 'Use make iso for a local image, or make iso-published with PAYLOAD_REF and TARGET_REF.\n' >&2
     exit 1
 fi
@@ -14,6 +14,11 @@ fi
 # shellcheck source=scripts/iso-common.sh
 source "${BASH_SOURCE[0]%/*}/iso-common.sh"
 gniri_validate_iso_refs "$payload" "$target"
+mkdir -p output
+# The output paths and rootful installer tag are shared; concurrent local runs
+# must not accidentally package one another's installer or provenance.
+exec 9>output/.iso-build.lock
+flock -n 9 || { printf 'Another ISO build is already running.\n' >&2; exit 1; }
 # renovate: datasource=docker depName=ghcr.io/osbuild/image-builder-cli
 builder=ghcr.io/osbuild/image-builder-cli:latest@sha256:98b1e2f70a0df78baaef727098fb1153ea52fb7cd336ecd45a4cc14bab5e418c
 if [[ $payload == localhost/gniri:development ]]; then
@@ -22,8 +27,18 @@ if [[ $payload == localhost/gniri:development ]]; then
         exit 1
     }
 else
+    # A digest authenticates content, not its author. Do not depend on the host's
+    # default containers policy or on whether this was launched by GitHub.
+    command -v cosign >/dev/null || { printf 'Published ISOs require Cosign.\n' >&2; exit 1; }
+    cosign verify --new-bundle-format=false --key trust/cosign.pub "$payload" >/dev/null
     podman pull "$payload"
 fi
+base=$(podman image inspect --format '{{ index .Config.Labels "org.opencontainers.image.base.name" }}' "$payload")
+[[ $base =~ ^quay.io/fedora/fedora-bootc:latest@sha256:[a-f0-9]{64}$ ]] || {
+    printf 'Payload lacks a resolved stable base; rebuild it with make build.\n' >&2; exit 1;
+}
+fresh_args=()
+if [[ ${4:-0} == 1 ]]; then fresh_args+=(--no-cache); fi
 # containers-storage reconstructs layer blobs in /var/tmp when bootc reads it.
 # On the live ISO that directory is RAM-backed. Export once at build time to an
 # OCI directory: its immutable blobs can be streamed straight from squashfs.
@@ -37,9 +52,10 @@ cleanup() {
 }
 trap cleanup EXIT
 podman save --format oci-dir --output "$payload_dir" "$payload"
-podman build "${network_args[@]}" --layers -f installer/Containerfile \
+podman build "${network_args[@]}" "${fresh_args[@]}" --layers -f installer/Containerfile \
     --build-context "gniri-payload=$payload_dir" \
     --build-arg "PAYLOAD_REF=$payload" --build-arg "TARGET_REF=$target" \
+    --build-arg "BASE_IMAGE=$base" \
     -t localhost/gniri-installer:latest .
 # COPY has embedded these blobs in the installer image. Release the staging
 # copy before osbuild creates its filesystem trees, squashfs and ISO exports.
@@ -59,4 +75,5 @@ if ! podman run "${network_args[@]}" --rm --privileged --security-opt label=type
     printf 'ISO generation failed. See %s/output/iso-build.log; the previous ISO was not replaced.\n' "$PWD" >&2
     exit 1
 fi
-python3 scripts/publish-iso.py "$build_dir" output/iso
+python3 scripts/iso-metadata.py "$payload" "$target" "$base" "$builder" "$build_dir/build.json"
+python3 scripts/publish-iso.py "$build_dir" output/iso --metadata "$build_dir/build.json"

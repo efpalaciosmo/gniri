@@ -1,8 +1,10 @@
 import hashlib
+import json
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import runpy
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -90,6 +92,28 @@ class IsoOutputTests(unittest.TestCase):
         result = self.publish()
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(outside.read_bytes(), b'old ISO')
+
+    def test_metadata_is_bound_to_the_new_iso_checksum(self):
+        self.make_artifact()
+        metadata = self.directory / 'inputs.json'
+        metadata.write_text(json.dumps({'payload_image_id': 'tested-image', 'validation': 'UNTESTED'}))
+        publish = runpy.run_path(str(ROOT / 'scripts/publish-iso.py'))['publish_iso']
+        publish(self.source, self.output, metadata)
+        record = json.loads((self.output / 'build.json').read_text())
+        self.assertEqual(record['iso_checksum'], (self.output / 'SHA256SUMS').read_text().strip())
+        self.assertEqual(record['payload_image_id'], 'tested-image')
+        self.assertEqual(record['validation'], 'UNTESTED')
+
+    def test_invalid_metadata_does_not_replace_an_existing_iso(self):
+        self.make_artifact()
+        previous = self.output / 'gniri-x86_64.iso'
+        previous.write_bytes(b'previous ISO')
+        metadata = self.directory / 'inputs.json'
+        metadata.write_text('{broken')
+        publish = runpy.run_path(str(ROOT / 'scripts/publish-iso.py'))['publish_iso']
+        with self.assertRaises(ValueError):
+            publish(self.source, self.output, metadata)
+        self.assertEqual(previous.read_bytes(), b'previous ISO')
 
     def test_builder_logs_and_uses_a_fresh_directory(self):
         script = (ROOT / 'scripts/build-iso.sh').read_text()

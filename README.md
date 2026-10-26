@@ -1,6 +1,6 @@
 # Gniri
 
-Sistema personal **Fedora 45 + bootc**, con **GNOME y Niri** seleccionables
+Sistema personal **Fedora estable + bootc**, con **GNOME y Niri** seleccionables
 desde GDM. Sin navegador, extensiones GNOME ni aplicaciones Flatpak
 preinstaladas; únicamente Flathub de usuario.
 
@@ -23,9 +23,16 @@ Las actualizaciones se preparan **los domingos a las 10:00, hora local**, con
 hasta 30 minutos de retraso aleatorio y recuperación si el equipo estaba apagado.
 **Nunca se reinicia automáticamente.**
 
+Cada construcción resuelve el canal oficial `fedora-bootc:latest` a un digest.
+No necesitas cambiar números de Fedora: Gniri sigue las versiones estables,
+no Rawhide. Los equipos siguen `gniri:stable`; los candidatos solo se promueven
+después de revisar pruebas de esa imagen. Esto no convierte Fedora en una
+distribución rolling ni garantiza transiciones de versión sin mantenimiento.
+
 ```sh
 make check
 make build
+make build REFRESH=1  # Renueva también los RPM aunque la base no haya cambiado.
 make iso    # Local: no requiere cuenta GitHub ni publicar la imagen.
 ```
 
@@ -36,9 +43,12 @@ descargas de actualización; `RECHUNK=0` permite omitir esa etapa al diagnostica
 
 > **En desarrollo:** no instalar en el equipo principal hasta probar la ISO,
 > Secure Boot, actualizaciones y rollback en una VM.
+> `make iso` es para desarrollo y no proporciona actualizaciones de registro.
+> Para el equipo principal, usar una imagen publicada, firmada y validada.
 
 - [Construcción, publicación e ISO](docs/building.md)
 - [Paquetes incluidos](docs/packages.md) · [uso y recuperación](docs/usage.md)
 - [Audio, energía, Wi-Fi, VPN y zram](docs/hardware.md)
 - [Dotfiles](docs/dotfiles.md) · [revisión técnica y fuentes](docs/architecture.md)
 - [Validación](docs/validation.md) · [pruebas pendientes](docs/testing.md)
+- [Canal estable y promoción](docs/releases.md) · [copias y recuperación](docs/recovery.md)

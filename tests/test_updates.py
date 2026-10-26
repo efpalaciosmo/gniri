@@ -33,19 +33,19 @@ class UpdateTests(unittest.TestCase):
     def test_queued_rollback_is_not_overridden(self):
         status = host()
         status['spec']['bootOrder'] = 'rollback'
-        with patch('subprocess.run') as run, self.assertRaises(SystemExit):
+        with patch('subprocess.run') as run, self.assertRaises(UPDATES['UpdateSkipped']):
             UPDATES['stage_update'](REFERENCE, status)
         run.assert_not_called()
 
     def test_manual_source_change_is_not_overridden(self):
         status = host()
         status['spec']['image']['image'] = 'ghcr.io/other/system:stable'
-        with patch('subprocess.run') as run, self.assertRaises(SystemExit):
+        with patch('subprocess.run') as run, self.assertRaises(UPDATES['UpdateSkipped']):
             UPDATES['stage_update'](REFERENCE, status)
         run.assert_not_called()
 
     def test_local_development_does_not_contact_registry(self):
-        with patch('subprocess.run') as run:
+        with patch('subprocess.run') as run, self.assertRaises(UPDATES['UpdateSkipped']):
             UPDATES['stage_update']('localhost/gniri:development', host())
         run.assert_not_called()
 
@@ -65,11 +65,16 @@ class UpdateTests(unittest.TestCase):
         self.assertIn("cron: '20 6 * * 6'", text)
         self.assertNotIn("cron: '20 6 * * *'", text)
 
-    def test_only_main_can_publish_stable(self):
+    def test_builds_never_promote_stable(self):
         text = (ROOT / '.github/workflows/build.yml').read_text()
         guard = "github.event_name != 'pull_request' && github.ref == 'refs/heads/main'"
         self.assertEqual(text.count(guard), 3)
         self.assertIn('persist-credentials: false', text)
+        self.assertNotRegex(text, r'podman push[^\n]+"\$IMAGE:stable"')
+        promotion = (ROOT / '.github/workflows/promote.yml').read_text()
+        self.assertIn('environment: stable', promotion)
+        self.assertIn('release-gate.py validate', promotion)
+        self.assertIn('--preserve-digests', promotion)
 
     def test_image_metadata_is_after_expensive_package_layers(self):
         text = (ROOT / 'Containerfile').read_text()

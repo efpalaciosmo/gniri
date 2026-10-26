@@ -163,9 +163,10 @@ de desarrollo o sin esa información conserva el aviso. Los mismos metadatos
 se incluyen en el entorno instalador y en su initramfs. No se altera el código
 de la interfaz para esconder avisos.
 
-La base fijada de Fedora 45 declara `RELEASE_TYPE=stable`. Esto explica la
-etiqueta que generará la ISO; no certifica que Gniri haya completado su
-[validación de publicación](testing.md).
+La base se resuelve ahora desde el canal estable oficial y se fija por digest
+para el payload y el instalador. `RELEASE_TYPE=stable` explica la etiqueta que
+generará Anaconda; no certifica que Gniri haya completado su
+[validación de publicación](testing.md). Véase [la política del canal](releases.md).
 
 ## Discos mostrados por Fastfetch
 

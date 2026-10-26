@@ -3,11 +3,13 @@
 ## Imagen local
 
 Requisitos: Linux x86_64, Podman, Make, Python 3, Internet y espacio para varios
-GB de descargas, cachés e imágenes. No se instala ni se modifica el anfitrión.
+GB de descargas, cachés e imágenes. La generación ISO necesita también `flock`
+(util-linux). No se instala ni se modifica el sistema operativo del anfitrión.
 
 ```sh
 make check
 make build
+make build REFRESH=1  # Sin caché de capas; conserva cachés de descargas.
 ```
 
 Resultado: `localhost/gniri:development`, sin cuentas ni credenciales y sin
@@ -55,8 +57,14 @@ desde imágenes antiguas puede necesitar descargar todas las capas nuevas.
 Véanse las [mediciones y pruebas](validation.md); no hay un ahorro fijo garantizado
 para todas las actualizaciones.
 
-Base y constructor ISO fijados por digest; descargas upstream fijadas por
-versión y SHA-256. Los RPM siguen los repositorios vivos de Fedora 45: no hay
+El canal oficial `quay.io/fedora/fedora-bootc:latest` se resuelve a un digest
+x86_64 antes de cada construcción. El instalador recibe el mismo digest desde
+la etiqueta OCI del payload: no vuelve a resolver `latest`. No se consultan
+números de versión ni el calendario de Fedora. La validación rechaza Rawhide y
+conserva las restricciones del backend, kernel y Secure Boot. Véase [releases.md](releases.md).
+
+Constructor ISO y descargas upstream fijados por digest/versión y SHA-256.
+Los RPM siguen los repositorios vivos de la versión estable elegida: no hay
 reproducibilidad bit a bit. Renovate puede proponer actualizaciones de digest
 y de acciones, pero las versiones/checksums en `build/upstream.env` requieren
 revisión explícita.
@@ -89,7 +97,9 @@ Anaconda lee sus blobs directamente mediante `oci:`, sin reconstruirlos en el
 asignar 10–12 GB de RAM para alojar una copia temporal de la imagen.
 
 La ISO se publica siempre como **`output/iso/gniri-x86_64.iso`**, junto con
-`output/iso/SHA256SUMS`. El nombre incluye la arquitectura del sistema anfitrión
+`output/iso/SHA256SUMS` y `output/iso/build.json`. El último registra base,
+payload, revisión, constructor y checksum; declara la ISO **sin validar**.
+El nombre incluye la arquitectura del sistema anfitrión
 soportado por Gniri (x86_64; no se ofrecen ISO ARM). Al terminar se muestra su
 ruta absoluta. Para verificarla desde la raíz del proyecto:
 
@@ -173,14 +183,18 @@ Los workflows de construcción y publicación requieren la configuración siguie
 2. Ejecutar `cosign generate-key-pair` y proteger la clave privada.
 3. Añadir **solo** `trust/cosign.pub` al repositorio.
 4. Crear los secretos GitHub `COSIGN_PRIVATE_KEY` y `COSIGN_PASSWORD`.
-5. Ejecutar **Build and publish Gniri** desde `main`.
+5. Configurar el entorno GitHub `stable` con revisores obligatorios.
 6. Hacer público `ghcr.io/<propietario-en-minúsculas>/gniri` para que el sistema
-   pueda actualizarse sin guardar credenciales GHCR.
+    pueda actualizarse sin guardar credenciales GHCR.
+7. Ejecutar **Build and publish Gniri** desde `main`: publica solo un candidato
+   firmado, ejecuta escritorio/Flatpak y prueba el cliente real de firmas.
+8. Generar/probar su ISO por digest, registrar evidencia y ejecutar el workflow
+   separado **Promote tested candidate to stable**. Véase [releases.md](releases.md).
 
 Las pull requests y ramas de prueba no publican. En `main` hay construcción
 por cambios de código, ejecución manual y programación semanal: **sábado
-06:20 UTC**, antes de la ventana dominical de los equipos. La firma se verifica
-antes de actualizar `stable`. Los relojes de publicación y del equipo son
+06:20 UTC**, antes de la ventana dominical de los equipos. Construir y firmar
+no actualiza `stable`; solo la promoción aprobada lo hace. Los relojes de publicación y del equipo son
 independientes: publicar una imagen no obliga a descargarla inmediatamente.
 
 Las ejecuciones programadas usan `--no-cache` para renovar los RPM aunque el
@@ -191,7 +205,8 @@ distinción entre firmas OCI y Secure Boot.
 ## ISO desde una imagen publicada
 
 Después de publicar una imagen firmada, ejecutar **Build installer ISO** en
-GitHub Actions. Crea una ISO x86_64 y SHA-256 como artefactos durante siete días;
+GitHub Actions. El parámetro `payload_digest` permite probar un candidato antes
+de promoverlo; vacío selecciona `stable`. Crea ISO, SHA-256 y metadatos como artefactos durante 30 días;
 no publica una release. La generación sigue siendo manual.
 
 O generar localmente una ISO de esa versión publicada:
@@ -201,6 +216,11 @@ make iso-published \
   PAYLOAD_REF=ghcr.io/owner/gniri@sha256:DIGEST \
   TARGET_REF=ghcr.io/owner/gniri:stable
 ```
+
+Este modo requiere Cosign en el `PATH` de root: verifica el digest contra
+`trust/cosign.pub` antes de descargarlo, también fuera de GitHub. La ISO de
+desarrollo sigue sin necesitar Cosign. Utiliza `REFRESH=1` para renovar también
+los RPM del instalador al preparar una release.
 
 Ambos caminos usan `image-builder` con privilegios y `bootc-generic-iso`, no la acción
 obsoleta `bootc-image-builder-action`. Anaconda vive en un contenedor instalador

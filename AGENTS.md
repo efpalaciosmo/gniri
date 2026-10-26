@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-Gniri builds a Fedora 45 bootc desktop with GNOME and Niri. The root `Containerfile` defines the OS image; `installer/` contains the Anaconda installer and target finalization logic. `build/` installs packages, configures the image, and validates its contents. `packages/*.txt` groups RPM dependencies, while `packages/visible-applications.allow` controls desktop launchers. `system_files/` mirrors installed filesystem paths for configuration, services, and runtime commands. `scripts/` handles checks, OCI repacking, and ISO generation. Tests live in `tests/`, documentation in `docs/`, and generated ISOs in `output/iso/`.
+Gniri builds a stable-tracking Fedora bootc desktop with GNOME and Niri. `scripts/build-image.py` resolves the official `latest` channel to a digest for each build; the root `Containerfile` defines the OS image. The installer inherits the payload's resolved base, never a separately resolved channel. `installer/` contains the Anaconda installer and target finalization logic. `build/` installs packages, configures the image, and validates its contents. `packages/*.txt` groups RPM dependencies, while `packages/visible-applications.allow` controls desktop launchers. `system_files/` mirrors installed filesystem paths for configuration, services, and runtime commands. `scripts/` handles checks, OCI repacking, and ISO generation. Tests live in `tests/`, documentation in `docs/`, and generated ISOs in `output/iso/`.
 
 ## Build, Test, and Development Commands
 
@@ -13,6 +13,8 @@ Run commands from the repository root. Image builds require Linux x86_64, Podman
 - `make check-desktop`: after building, verify Kitty maps a window in nested Niri inside a disposable headless container.
 - `make iso`: build the local image and generate `output/iso/gniri-x86_64.iso`; requests sudo for privileged build operations.
 - `make build RECHUNK=0`: skip layer repacking for diagnosis.
+- `make build REFRESH=1`: rerun package transactions while preserving download caches.
+- `sudo make check-installer`: run real mount/finalizer regressions in the built rootful installer.
 
 ## Coding Style & Naming Conventions
 
@@ -29,3 +31,4 @@ History uses concise imperative subjects, such as “Reduce peak disk usage whil
 ## Security & Configuration
 
 Commit only public signing material under `trust/`; keep private keys and credentials out of Git. Preserve Fedora Secure Boot trust, installed SELinux Enforcing, signed update verification, and user-owned dotfiles.
+Never promote a build directly to `stable`. Promotion requires artifact-specific reviewed evidence and the protected `stable` GitHub environment; see `docs/releases.md`.

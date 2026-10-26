@@ -18,7 +18,7 @@ Radeon ofrecen las funciones de las GPU de centro de datos. No se deben
 cambiar permisos globales de `/dev/dri` para resolver un error sin diagnosticarlo.
 
 Se incluyen libva y los drivers VA-API de Mesa/Intel, Intel Media SDK para
-generaciones compatibles y el runtime VPL moderno. Fedora 45 incluye los drivers
+generaciones compatibles y el runtime VPL moderno. La base estable validada incluye los drivers
 VA-API de Mesa en `mesa-dri-drivers`. No se impone `LIBVA_DRIVER_NAME` globalmente:
 debe seleccionarse el driver adecuado para cada GPU, también en sistemas híbridos.
 

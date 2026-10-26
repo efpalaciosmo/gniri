@@ -2,12 +2,17 @@
 """Dependency-free source checks. Full image and hardware checks are separate."""
 import ast
 import json
+import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
+if os.environ.get('GNIRI_STRICT_CHECKS') == '1':
+    missing = [name for name in ('shellcheck', 'actionlint') if not shutil.which(name)]
+    if missing:
+        raise SystemExit(f'Required CI validators are missing: {missing}')
 config = ROOT / 'system_files/etc/niri/config.kdl'
 scripts = []
 for tree in ('build', 'scripts', 'tests', 'installer', 'system_files'):
@@ -36,4 +41,8 @@ if shutil.which('shellcheck'):
     subprocess.run(['shellcheck', '-x', '-S', 'warning', *map(str, scripts)], check=True)
 else:
     print('shellcheck not installed locally; Bash syntax has been checked.')
+if shutil.which('actionlint'):
+    subprocess.run(['actionlint', *map(str, sorted((ROOT / '.github/workflows').glob('*.yml')))], check=True)
+elif os.environ.get('GNIRI_STRICT_CHECKS') != '1':
+    print('actionlint not installed locally; CI requires workflow validation.')
 print(f'Static checks passed ({len(scripts)} Bash scripts).')

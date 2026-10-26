@@ -1,5 +1,70 @@
 # Validation record
 
+## Stable-channel hardening (2026-10-25, local date)
+
+This is an implementation/containment validation, **not a production release**.
+Source was the working tree based on `fad8ad8ebff380693e89276d63b9943d80e6508b`
+with uncommitted hardening changes. No completed release-evidence record was
+created and no registry image was published, signed or promoted by this task.
+The local tag containing "signed-validation" means registry-policy-configured,
+not that the image itself has a registry signature.
+
+- Chosen channel: official `quay.io/fedora/fedora-bootc:latest`, currently
+  Fedora 44, resolved to Linux x86_64 digest
+  `sha256:5e7fcb515bdfbe6e6f83e322ab221eefada34db7d12773a054f2b1b11160cdd6`.
+  Rawhide and manual Fedora-version bumps are not used. Installer preparation
+  used that same digest, not another resolution of `latest`.
+- Required ShellCheck 0.11.0/actionlint 1.7.7, Niri validation, Python/Bash
+  syntax and **100 unit tests** passed. Temporary audit binaries were downloaded
+  with checksum verification outside the repository; no host packages were installed.
+- A fresh stable image resolved all requested packages, including the latest
+  hardware additions, dynamic `f44` backgrounds and upstream checksums. The
+  stock boot path/hardware dependency checks and all 14 bootc lint checks pass
+  (one upstream skip). The tested image has bootc 1.17.1, OSTree 2026.4,
+  Niri 26.04 and kernel 7.2.11-200.fc44.
+- Both development and GHCR-policy configurations built. An unnecessary attempt
+  to write the resolved base into the pre-existing root-owned `output/` directory
+  failed after the first successful image build; that bookkeeping write was
+  removed. The authoritative base/revision are recorded in image metadata.
+- The final registry-policy-configured image was repacked as
+  `3c40558200daed66f0c020d32f0ec03dbdb309de2bb84db19f48449c8f85d41a`.
+  All **92,529 paths**, image configuration and lint checks passed. It has 128
+  layers totaling 2,122,506,663 gzip bytes. No download saving is inferred from
+  this single image. Its installed updater was checked byte-for-byte against
+  the working-tree source.
+- Kitty mapped a window in nested Niri in a disposable Weston container, both
+  before and after repacking. Weston/software rendering remain test-only.
+  Offline user Flathub registration, GPG verification and idempotency pass.
+- The real OSTree container client, with networking disabled, reproduced rejection
+  of the insecure global policy default. With the strict policy, it passed that
+  precheck and failed only at the expected registry DNS lookup. This validates
+  the specific compatibility regression, **not** live signature acceptance.
+  The added CI registry fixtures must still run against the actual published
+  candidate; full bootc staging/rejection remains a booted-VM gate.
+- The real updater process in a disposable container recognized a deliberate
+  pause, returned success without running bootc and recorded a skipped result.
+  Effective service/timer definitions pass `systemd-analyze verify`. Unit tests
+  cover strict environment selection, failure reporting, last-success retention,
+  staged digest recording, malformed status recovery and atomic-write failure.
+- Built `localhost/gniri-installer:hardening-validation`, image
+  `b156e86cd83d82751edf6684ff13daad7c09759484a6681c2300fa3654a1de50`, rootlessly.
+  Anaconda 44.30-2 patching/initramfs/OCI embedding succeeded. Its real tmpfs
+  regressions passed all four home/var/EFI mount layouts and both OSTree `/boot`
+  layouts, including failed-write fstab preservation, readback and idempotency.
+  No physical disk or partitioner was used.
+- Logs are outside the repository under `/tmp/opencode/gniri-*.log`; these are
+  local troubleshooting artifacts, not durable release evidence. CI must archive
+  reviewed, artifact-specific evidence according to [releases.md](releases.md).
+- **Not performed:** final privileged ISO generation (interactive sudo required),
+  fresh ISO installation, Secure Boot, GDM login, physical hardware/suspend,
+  live registry-backed bootc update/rollback, backup restoration, GitHub environment
+  configuration or remote workflow execution. The existing October 19 ISO was
+  left untouched and does not represent this implementation. Regenerate it;
+  development ISOs still do not provide a maintained registry update source.
+
+The following entries are historical snapshots of older images, not evidence
+that the new channel or current HEAD passed their boot/hardware tests.
+
 ## Modern hardware, zram and OCI layer repacking (2026-10-19)
 
 - Added ALSA UCM/SOF, ALSA/PipeWire/PulseAudio client diagnostic tools, explicit

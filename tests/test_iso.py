@@ -46,8 +46,8 @@ class IsoReferencesTests(unittest.TestCase):
     def test_host_network_is_opt_in_and_reaches_all_build_stages(self):
         result = subprocess.run(['make', '-n', 'iso', 'BUILD_NETWORK=host'], cwd=ROOT,
                                 text=True, capture_output=True, check=True)
-        self.assertIn('podman build --network="host"', result.stdout)
-        self.assertIn('GNIRI_BUILD_NETWORK="host" bash scripts/build-local-iso.sh', result.stdout)
+        self.assertIn('--network "host"', result.stdout)
+        self.assertIn('GNIRI_BUILD_NETWORK="host" GNIRI_REFRESH="0" bash scripts/build-local-iso.sh', result.stdout)
         script = (ROOT / 'scripts/build-iso.sh').read_text()
         self.assertIn('network_args=()', script)
         self.assertIn('network_args+=(--network="$3")', script)
@@ -56,7 +56,7 @@ class IsoReferencesTests(unittest.TestCase):
     def test_published_workflow_still_verifies_signatures(self):
         workflow = (ROOT / '.github/workflows/iso.yml').read_text()
         self.assertIn('cosign verify --new-bundle-format=false --key trust/cosign.pub', workflow)
-        self.assertIn('sudo bash scripts/build-iso.sh "$image@$digest" "$image:stable"', workflow)
+        self.assertIn('bash scripts/build-iso.sh "$image@$digest" "$image:stable"', workflow)
 
     def test_generic_iso_has_required_builder_rootfs_metadata(self):
         script = (ROOT / 'scripts/build-iso.sh').read_text()

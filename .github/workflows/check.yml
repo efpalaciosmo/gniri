@@ -20,5 +20,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      - name: Install required validators
+        run: bash scripts/install-ci-checks.sh
       - name: Static checks and unit tests
-        run: make check
+        run: GNIRI_STRICT_CHECKS=1 make check

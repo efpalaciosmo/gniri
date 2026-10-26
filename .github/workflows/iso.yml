@@ -2,6 +2,11 @@ name: Build installer ISO
 
 on:
   workflow_dispatch:
+    inputs:
+      payload_digest:
+        description: Signed candidate sha256 digest (empty selects current stable)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -19,8 +24,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      - name: Install required validators
+        run: bash scripts/install-ci-checks.sh
       - name: Static checks
-        run: make check
+        run: GNIRI_STRICT_CHECKS=1 make check
       - name: Free disk space for the installer ISO
         run: |
           df -h /
@@ -35,24 +42,30 @@ jobs:
         env:
           OWNER: ${{ github.repository_owner }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PAYLOAD_DIGEST: ${{ inputs.payload_digest }}
         run: |
           image="ghcr.io/${OWNER,,}/gniri"
           test -s trust/cosign.pub
           printf '%s' "$REGISTRY_TOKEN" | sudo podman login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           printf '%s' "$REGISTRY_TOKEN" | cosign login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          sudo podman pull "$image:stable"
-          digest=$(sudo podman image inspect --format '{{.Digest}}' "$image:stable")
-          test -n "$digest"
+          digest="$PAYLOAD_DIGEST"
+          if [[ -z $digest ]]; then
+            digest=$(sudo skopeo inspect --format '{{.Digest}}' "docker://$image:stable")
+          fi
+          [[ $digest =~ ^sha256:[a-f0-9]{64}$ ]]
           cosign verify --new-bundle-format=false --key trust/cosign.pub "$image@$digest"
-          sudo bash scripts/build-iso.sh "$image@$digest" "$image:stable"
+          sudo env "PATH=$PATH" bash scripts/build-iso.sh "$image@$digest" "$image:stable" '' 1
           sudo chown -R "$(id -u):$(id -g)" output/iso
           cd output/iso
           sha256sum --check SHA256SUMS
+      - name: Real installer mount and finalization regressions
+        run: sudo make check-installer
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: gniri-installer-x86_64
           path: |
             output/iso/gniri-x86_64.iso
             output/iso/SHA256SUMS
+            output/iso/build.json
           compression-level: 0
-          retention-days: 7
+          retention-days: 30

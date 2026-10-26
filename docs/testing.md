@@ -3,6 +3,23 @@
 Do not call this image production-ready until these checks pass. Container
 build validation is not a substitute for a boot test.
 
+## Artifact-specific evidence
+
+Every release starts with a new evidence record. Checkboxes below are a test
+inventory, **not** proof that current HEAD passed. Historical results belong to
+the dated images in [validation.md](validation.md), not future builds.
+The source workflow requires ShellCheck/actionlint; the image workflow also
+runs nested Kitty/Niri, offline Flatpak and real containers/image signature
+acceptance/rejection. The ISO workflow runs the real installer regressions.
+Full bootc enforcement, GDM, Secure Boot and physical hardware remain separate
+gates. See [candidate promotion](releases.md): stable is never updated by a build.
+
+Record the source revision, payload digest, resolved Fedora base, ISO SHA-256,
+VM firmware/certificate configuration and test logs. `output/iso/build.json`
+binds the inputs to that ISO but deliberately declares it untested. Complete
+the generated evidence template only after running every check. Configure
+reviewers for GitHub's `stable` environment; do not use placeholder evidence.
+
 After `make build`, run `make check-desktop` to launch a test-only headless
 Weston, start the image's Niri with its real fallback configuration, and verify
 that Kitty maps a window in Niri. The test uses software rendering in an isolated
@@ -14,12 +31,12 @@ the VM's DRM/3D setup.
 
 - [x] `make check`: Bash/Python syntax, English minimal Niri configuration,
       no personal dotfiles, weekly scheduling and safe update tests.
-- [x] `make build`: RPM resolution, upstream checksums, font discovery,
+- [ ] Release `make build REFRESH=1`: RPM resolution, upstream checksums, font discovery,
       modules, desktop sessions and `bootc container lint`.
-- [x] First-build launcher review: Files, Settings, Software, Kitty, Zathura,
+- [ ] Release launcher review: Files, Settings, Software, Kitty, Zathura,
       virt-manager and btop. Subsequent builds enforce the allowlist, now including nvtop.
-- [x] No Firefox, unwanted GNOME applications, system remotes or Flatpak apps.
-- [x] User session units pass `systemd-analyze verify`; no ordering cycles.
+- [ ] No Firefox, unwanted GNOME applications, system remotes or Flatpak apps.
+- [ ] User session units pass `systemd-analyze verify`; no ordering cycles.
 - [ ] No `/usr/local/sbin` creation warning from tmpfiles on the regenerated ISO
       or on first boot; `/usr` must remain read-only, not remounted as a workaround.
 - [ ] Confirm installed OSTree deployment uses composefs (mount information)
@@ -86,7 +103,7 @@ repository mount; it does not change the installer or installed SELinux mode.
 - [ ] Both GDM sessions work and session selection is remembered.
 - [ ] Kitty creates a window in both GNOME and Niri; check Niri's user journal
       on a login failure. Container dependency checks do not prove GDM/DRM works.
-- [ ] Fedora 45 and GNOME backgrounds appear in GNOME's background chooser.
+- [ ] The resolved Fedora release's and GNOME backgrounds appear in GNOME's background chooser.
 - [ ] Fresh Niri login uses `/etc/niri/config.kdl`; user Flathub only.
 - [ ] An existing `~/.config/niri/config.kdl` takes precedence without copying.
 - [ ] Existing configs/Stow links survive login and an image update unchanged.
@@ -102,8 +119,14 @@ repository mount; it does not change the installer or installed SELinux mode.
 - [ ] Idle lock and lock-before-suspend work; no unlocked flash after resume.
 - [ ] Correct image tag/registry after install; update signature enforcement.
 - [ ] Sunday timer and missed-run catch-up stage without restarting the VM.
+- [ ] A failed network/signature check records failure; at most four attempts
+      occur within two hours. A rollback/source-change/pause is skipped without retry.
+- [ ] Manual `gniri-stage-update` uses the immutable strict policy even if the
+      caller sets `CONTAINERS_POLICY_JSON`; ordinary Podman/Distrobox pulls still work.
 - [ ] Manual reboot enters new deployment; rollback restores previous system.
 - [ ] `/home`, libvirt guests and Tailscale state survive update and rollback.
+- [ ] Interrupted update/full-disk tests preserve a bootable deployment; backup
+      restoration to a different disposable disk works. See [recovery.md](recovery.md).
 
 ## Physical AMD workstation
 
@@ -122,6 +145,7 @@ repository mount; it does not change the installer or installed SELinux mode.
       station interfaces usually cannot be bridged without additional support.
 - [ ] SELinux remains enforcing and firewalld enabled.
 
-The ISO workflow currently runs manually and uploads short-lived artifacts,
-not releases. GitHub-hosted runners have limited disk space; measure image/ISO
+The ISO workflow runs manually and uploads 30-day artifacts, not public
+releases. Archive reviewed evidence and tested artifacts durably before promotion.
+GitHub-hosted runners have limited disk space; measure image/ISO
 size before scheduling ISO generation or choosing a larger/self-hosted runner.

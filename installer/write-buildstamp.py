@@ -8,8 +8,8 @@ import platform
 
 def buildstamp(release, epoch):
     version = release['VERSION_ID']
-    if version != '45':
-        raise ValueError(f'Expected the Fedora 45 installer base, got {version}')
+    if release.get('ID', 'fedora') != 'fedora' or not version.isdecimal():
+        raise ValueError(f'Expected a numbered Fedora installer base, got {version}')
     # Missing/unknown maturity never silently turns a development base final.
     final = release.get('RELEASE_TYPE') == 'stable'
     timestamp = datetime.fromtimestamp(epoch, timezone.utc).strftime('%Y%m%d%H%M')

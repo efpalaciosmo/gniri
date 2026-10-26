@@ -20,9 +20,9 @@ if (( EUID != 0 )); then
         exit 1
     }
     # Pass the requested mode explicitly: sudo normally filters environment.
-    sudo bash scripts/build-iso.sh "$image" "$image" "$network"
+    sudo bash scripts/build-iso.sh "$image" "$image" "$network" "${GNIRI_REFRESH:-0}"
     # Only adjust generated output, never the repository or system files.
     sudo chown -R "$(id -u):$(id -g)" output/iso
 else
-    bash scripts/build-iso.sh "$image" "$image" "$network"
+    bash scripts/build-iso.sh "$image" "$image" "$network" "${GNIRI_REFRESH:-0}"
 fi

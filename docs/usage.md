@@ -69,6 +69,9 @@ diagnóstico, consulta [hardware.md](hardware.md).
 Las ISO creadas con `make iso` contienen una imagen local de desarrollo:
 no descargan actualizaciones de un registro inexistente. El calendario que
 sigue se aplica al instalar una imagen publicada con un origen GHCR válido.
+Para uso permanente, instala una ISO publicada/firmada/validada, no la de
+desarrollo. El origen Gniri `:stable` no cambia al pasar a una nueva versión
+Fedora; no se modifica automáticamente ningún sistema que apunte a otro origen.
 
 `bootc-fetch-apply-updates.timer` prepara actualizaciones **cada domingo a las
 10:00, hora local**, con hasta 30 minutos de retraso aleatorio. Se eliminan
@@ -76,7 +79,9 @@ los disparadores por arranque y por intervalos del timer original. No hay
 comprobación diaria. `Persistent=true` recupera una ejecución perdida cuando
 el equipo vuelva a encenderse, aunque ya no sea domingo; no lo despierta.
 
-Primero se exige la política de firmas de Gniri. `bootc upgrade` prepara el
+El helper selecciona `/usr/share/gniri/bootc-policy.json`, una política estricta
+separada de los valores generales de Podman/Distrobox. Primero se exige la
+política de firmas de Gniri. `bootc upgrade`, invocado por el helper, prepara el
 nuevo despliegue para el siguiente reinicio **decidido por ti**. No se usa
 `--apply`, reinicio automático, soft reboot automático ni `systemd-sysupdate`.
 Elegir frecuencia semanal retrasa la recepción de correcciones respecto a la
@@ -86,20 +91,36 @@ frecuencia diaria; siempre puedes actualizar manualmente.
 bootc status
 systemctl list-timers bootc-fetch-apply-updates.timer
 journalctl -u bootc-fetch-apply-updates.service
-sudo bootc upgrade  # No reinicia.
+gniri-stage-update --status
+sudo gniri-stage-update  # Mismas comprobaciones que el timer; no reinicia.
 ```
 
 GNOME Software gestiona aparte las actualizaciones de aplicaciones Flatpak.
 El timer del sistema no reinicia tus máquinas virtuales.
+No uses `bootc upgrade` directamente como ruta habitual: omite el helper que
+selecciona la política estricta y comprueba el origen/rollback/pausa.
+
+Una ejecución fallida se reintenta cada 15 minutos, hasta cuatro intentos
+dentro de dos horas. No se añade una comprobación diaria. Las pausas, imágenes
+locales, orígenes cambiados y rollback pendiente son omisiones deliberadas y
+no se reintentan. El resultado y la última comprobación correcta quedan en
+`/var/lib/gniri/updates/status.json`; un éxito significa comprobación de firma,
+no que el nuevo escritorio ya haya sido probado. Revisa `--status` y el journal
+si no se ha completado la comprobación semanal; no hay notificación gráfica.
 
 ## Rollback
 
 ```sh
 sudo systemctl disable --now bootc-fetch-apply-updates.timer
+sudo systemctl stop bootc-fetch-apply-updates.service  # Cancela también reintentos.
+sudo install -D -m 0644 /dev/null /etc/gniri/updates-paused
 sudo bootc rollback
 # Reinicia manualmente cuando hayas cerrado tu trabajo.
 ```
 
 También puedes elegir el despliegue anterior en GRUB. Mantén el timer
 desactivado hasta resolver el fallo para que no prepare de nuevo la versión
-problemática. Al resolverlo: `sudo systemctl enable --now bootc-fetch-apply-updates.timer`.
+problemática. Al resolverlo, elimina deliberadamente `/etc/gniri/updates-paused`,
+ejecuta `sudo systemctl reset-failed bootc-fetch-apply-updates.service` y vuelve
+a habilitar el timer. No vuelvas a preparar un digest que ya sabes que falla.
+Consulta [copias, GRUB y recuperación](recovery.md): rollback no restaura tus datos.

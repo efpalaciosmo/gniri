@@ -5,7 +5,7 @@ La fuente de verdad son los manifiestos, no una segunda lista copiada aquí:
 | Manifiesto | Contenido |
 | --- | --- |
 | [core.txt](../packages/core.txt) | Git, Make, Stow, Podman, Fastfetch, `vi`/`vim`, traceroute, Zsh y utilidades. |
-| [desktop.txt](../packages/desktop.txt) | GNOME Shell, GDM, Settings, Files, Software, Keyring, audio, portales y fondos oficiales Fedora 45/GNOME. |
+| [desktop.txt](../packages/desktop.txt) | GNOME Shell, GDM, Settings, Files, Software, Keyring, audio, portales y fondos oficiales Fedora/GNOME. |
 | [niri.txt](../packages/niri.txt) | Niri, Kitty, Waybar, Fuzzel, Mako, bloqueo, portapapeles y Zathura. |
 | [hardware.txt](../packages/hardware.txt) | Kernel/módulos Fedora, firmware AMD/Intel y Wi-Fi moderno, Mesa/RADV, Bluetooth, Wacom, Steam Input, TuneD, OpenVPN y zram. |
 | [security.txt](../packages/security.txt) | Módulos PAM U2F/Yubico y `pamu2fcfg`, sin modificar las políticas de inicio de sesión. |
@@ -17,7 +17,8 @@ llama `traceroute`, no `traceruter`.
 Fastfetch no existía y se añade sin configuración ni ejecución automática
 al abrir la terminal.
 
-`f45-backgrounds-gnome` incluye el fondo oficial de Fedora 45 y su registro en
+`f<VERSION_ID>-backgrounds-gnome`, seleccionado automáticamente desde la base,
+incluye el fondo oficial de esa versión Fedora y su registro en
 el selector de GNOME; `gnome-backgrounds` aporta la colección estándar. No se
 sobrescribe el fondo elegido por el usuario. `dbus-tools` se declara
 explícitamente para que `niri-session` pueda actualizar el entorno de activación

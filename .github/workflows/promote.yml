@@ -1,0 +1,58 @@
+name: Promote tested candidate to stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      evidence:
+        description: Committed release-evidence/name.json with reviewed results and log URLs
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promote-stable
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Configure required reviewers for this environment in GitHub settings.
+    environment: stable
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install required validators
+        run: bash scripts/install-ci-checks.sh
+      - name: Static checks
+        run: GNIRI_STRICT_CHECKS=1 make check
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.3
+      - name: Validate evidence and promote the exact signed digest
+        env:
+          EVIDENCE: ${{ inputs.evidence }}
+          OWNER: ${{ github.repository_owner }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          [[ $EVIDENCE =~ ^release-evidence/[a-zA-Z0-9_-]+\.json$ ]]
+          image="ghcr.io/${OWNER,,}/gniri"
+          digest=$(jq -er .payload_digest "$EVIDENCE")
+          revision=$(jq -er .source_revision "$EVIDENCE")
+          python3 scripts/release-gate.py validate --digest "$digest" --revision "$revision" --output "$EVIDENCE"
+          printf '%s' "$REGISTRY_TOKEN" | sudo podman login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          cosign verify --new-bundle-format=false --key trust/cosign.pub "$image@$digest"
+          actual=$(sudo skopeo inspect --format '{{ index .Labels "org.opencontainers.image.revision" }}' "docker://$image@$digest")
+          test "$actual" = "$revision"
+          sudo skopeo copy --all --preserve-digests "docker://$image@$digest" "docker://$image:stable"
+          actual=$(sudo skopeo inspect --format '{{.Digest}}' "docker://$image:stable")
+          test "$actual" = "$digest"
+          cosign verify --new-bundle-format=false --key trust/cosign.pub "$image@$actual"

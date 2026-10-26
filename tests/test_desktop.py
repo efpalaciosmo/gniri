@@ -84,10 +84,12 @@ class DesktopTests(unittest.TestCase):
 
     def test_fedora_backgrounds_and_session_helper_are_explicit(self):
         packages = (ROOT / 'packages/desktop.txt').read_text().splitlines()
-        for package in ('f45-backgrounds-gnome', 'gnome-backgrounds', 'dbus-tools'):
+        for package in ('gnome-backgrounds', 'dbus-tools'):
             self.assertIn(package, packages)
+        installation = (ROOT / 'build/install-packages.sh').read_text()
+        self.assertIn('f${VERSION_ID}-backgrounds-gnome', installation)
         validation = (ROOT / 'build/validate-image.sh').read_text()
-        self.assertIn('/usr/share/gnome-background-properties/f45.xml', validation)
+        self.assertIn('/usr/share/gnome-background-properties/f${VERSION_ID}.xml', validation)
         self.assertIn('dbus-update-activation-environment', validation)
 
     def test_graphics_libraries_are_checked_beyond_executable_presence(self):

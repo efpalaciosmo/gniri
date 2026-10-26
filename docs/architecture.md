@@ -5,17 +5,22 @@ interfaces actuales y cambiar a una arquitectura distinta solo por ser nueva.
 
 | Área | Decisión y motivo |
 | --- | --- |
-| Base | Tag oficial Fedora 45 bootc fijado por digest, solicitado por el usuario; selección explícita de RPM sin Workstation ni Silverblue. |
+| Base | Canal oficial Fedora bootc `latest` (estable), resuelto por construcción a digest; el instalador usa el del payload. Selección explícita de RPM sin Workstation ni Silverblue. |
 | Despliegue | Backend OSTree con composefs activado, tal como lo suministra Fedora; no backend composefs nativo. |
 | Construcción | Containerfile + Podman/DNF5 y cachés de descarga. Chunkah reorganiza después las capas OCI, con comparación del contenido y lint antes de sustituir la etiqueta. No hace falta añadir mkosi/BuildStream para esta composición. |
 | Configuración | Respaldo nativo `/etc/niri/config.kdl`; dotfiles exclusivamente del usuario. Se eliminan el importador, copia en login, temas y overrides GNOME. |
 | Actualización | Timer systemd upstream con calendario dominical y `bootc upgrade` sin `--apply`. Calendarios persistentes recuperan ejecuciones perdidas. |
-| Publicación | GHCR, digest inmutable, Cosign y política de firmas en el equipo; no basta con firmar en CI. |
+| Publicación | Candidato GHCR por digest, Cosign, pruebas del cliente real y promoción separada con evidencia/revisión. Política bootc estricta independiente de Podman. |
 | ISO | `image-builder build ... bootc-generic-iso`, con Anaconda separado y payload embebido; la interfaz antigua `anaconda-iso` y su acción están obsoletas. |
 | Virtualización | Daemons modulares libvirt y sockets UNIX; autorización explícita de una sola cuenta, no grupo `input` ni apertura TCP. |
 | Seguridad | Kernel Fedora y SELinux Enforcing en Gniri; solo el entorno ISO usa SELinux permisivo siguiendo Anaconda/bootc. Sin akmods. Secure Boot sigue pendiente de prueba. |
 
 ## Mejoras aplicadas en esta revisión
+
+La política actual de canal estable y promoción se define en [releases.md](releases.md).
+Las notas siguientes conservan el contexto de decisiones anteriores; no son
+evidencia de validación de la imagen actual. Ya no se exige Fedora 45 ni se
+cambia su número manualmente.
 
 - Un solo archivo de Niri y ningún aprovisionamiento de dotfiles.
 - Fastfetch añadido; `vi` ya estaba mediante `vim-minimal`, sin otro Vim.
@@ -60,16 +65,16 @@ independiente, pues cambian requisitos de instalación y verificación.
 La migración al backend nativo queda aplazada hasta revisar su integración con
 el instalador, Secure Boot y recuperación. Upstream actual lo declara soportado,
 pero no existe una migración in-place desde OSTree; hoy podría requerir
-reinstalar. No se prometerá una migración automática futura. La versión actual
-de nuestra imagen es 1.16.13; upstream 1.17.1 tiene documentación y correcciones
-posteriores, por lo que no se deben confundir sus interfaces y garantías.
+reinstalar. No se prometerá una migración automática futura. La revisión del
+19 de octubre usó bootc 1.16.13 y comparó documentación 1.17.1: son referencias
+históricas. Consulta el inventario de cada candidato para sus versiones reales.
 
 Cosign 3 permite formatos nuevos, pero containers/image no reconoce todos de
 igual manera. Se conserva explícitamente el formato compatible con su política
 `sigstoreSigned`; se debe probar la verificación en el propio cliente bootc.
 El usuario ya generó e instaló ISO de Gniri en QEMU. Se han identificado y
 corregido problemas del instalador; eso no sustituye la validación completa de
-la receta actual ni demuestra que la migración a Fedora 45 esté lista para el
+la receta actual ni demuestra que el nuevo canal estable esté listo para el
 equipo principal. Véase el registro de validación y sus límites.
 
 El ejemplo actual de image-builder aún usa `interactive-defaults.ks`; Anaconda

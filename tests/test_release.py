@@ -25,18 +25,21 @@ class ReleaseTests(unittest.TestCase):
                 self.assertEqual(parser['Main']['Version'], '45')
                 self.assertEqual(parser['Main']['UUID'], '197001010000.x86_64')
 
-    def test_buildstamp_rejects_unexpected_base_versions(self):
-        with self.assertRaises(ValueError):
-            metadata.buildstamp({'VERSION_ID': '44', 'RELEASE_TYPE': 'stable'}, 0)
+    def test_buildstamp_follows_numbered_fedora_releases_but_not_rawhide(self):
+        for version in ('44', '45', '46'):
+            self.assertIn(f'Version={version}', metadata.buildstamp({'VERSION_ID': version}, 0))
+        for version in ('rawhide', 'development', ''):
+            with self.assertRaises(ValueError):
+                metadata.buildstamp({'VERSION_ID': version}, 0)
 
-    def test_installer_and_payload_use_the_same_pinned_45_base(self):
-        bases = []
+    def test_installer_uses_the_payloads_resolved_stable_base(self):
         for file in ('Containerfile', 'installer/Containerfile'):
             text = (ROOT / file).read_text()
             base = re.search(r'^FROM (.+)$', text, re.MULTILINE).group(1)
-            self.assertRegex(base, r'^quay\.io/fedora/fedora-bootc:45@sha256:[a-f0-9]{64}$')
-            bases.append(base)
-        self.assertEqual(*bases)
+            self.assertEqual(base, '${BASE_IMAGE}')
+        script = (ROOT / 'scripts/build-iso.sh').read_text()
+        self.assertIn('org.opencontainers.image.base.name', script)
+        self.assertIn('--build-arg "BASE_IMAGE=$base"', script)
 
     def test_release_branding_uses_the_actual_base_version(self):
         configure = (ROOT / 'build/configure-image.py').read_text()

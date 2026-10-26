@@ -1,33 +1,117 @@
 #!/usr/bin/env python3
-"""Enroll the installed image in signature verification, then stage updates."""
+"""Stage verified updates only; never restart the machine."""
+import argparse
+from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import subprocess
+import tempfile
 
-def stage_update(reference, status):
+POLICY = '/usr/share/gniri/bootc-policy.json'
+STATE = Path('/var/lib/gniri/updates/status.json')
+PAUSE = Path('/etc/gniri/updates-paused')
+REFERENCE_FILE = Path('/usr/share/gniri/image-reference')
+
+
+class UpdateSkipped(Exception):
+    """A deliberate safety stop, not a network failure to retry."""
+
+
+def policy_environment(reference):
+    policy = json.loads(Path(POLICY).read_text())
+    repository = reference.rsplit(':', 1)[0]
+    rule = policy['transports']['docker'][repository]
+    expected = [{'type': 'sigstoreSigned', 'keyPath': '/usr/share/gniri/keys/cosign.pub',
+                 'signedIdentity': {'type': 'matchRepository'}}]
+    if (policy['default'] != [{'type': 'reject'}] or rule != expected
+            or set(policy['transports']) != {'docker'}
+            or set(policy['transports']['docker']) != {repository}):
+        raise ValueError('The immutable Gniri bootc signature policy is not strict')
+    return dict(os.environ, CONTAINERS_POLICY_JSON=POLICY)
+
+
+def save_state(path, outcome, message, now=None, staged_digest=None):
+    path.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    try:
+        state = json.loads(path.read_text()) if path.exists() else {}
+    except json.JSONDecodeError:
+        state = {'previous_state_error': 'Previous status record was invalid JSON.'}
+    if not isinstance(state, dict):
+        state = {'previous_state_error': 'Previous status record was not a JSON object.'}
+    now = now or datetime.now(timezone.utc).isoformat()
+    state.update(last_attempt=now, outcome=outcome, message=message)
+    if outcome == 'success':
+        state['last_success'] = now
+        state['staged_digest'] = staged_digest
+    descriptor, name = tempfile.mkstemp(prefix='.status-', dir=path.parent)
+    try:
+        with os.fdopen(descriptor, 'w') as stream:
+            json.dump(state, stream, indent=2)
+            stream.write('\n')
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(name, 0o644)
+        os.replace(name, path)
+    finally:
+        Path(name).unlink(missing_ok=True)
+
+
+def stage_update(reference, status, environment=None):
     if not reference.startswith('ghcr.io/'):
-        print('Local development image: automatic updates are unavailable.')
-        return
+        raise UpdateSkipped('Local development image: registry updates are unavailable.')
     if status['spec'].get('bootOrder') == 'rollback' or status['status'].get('rollbackQueued'):
-        raise SystemExit('Rollback queued; automatic update skipped.')
+        raise UpdateSkipped('Rollback queued; update skipped.')
     booted = status['status']['booted']['image']['image']
     target = status['spec'].get('image')
     if (booted['image'] != reference or not target or target['image'] != reference
             or target['transport'] != 'registry'):
-        raise SystemExit('Update source differs from this image. Review the source before updating.')
+        raise UpdateSkipped('Update source differs from this image. Review the source before updating.')
     if target.get('signature') != 'containerPolicy':
         # Anaconda's bootc command does not expose the policy flag. Enroll
         # before the first automatic update; switch also stages the update.
-        subprocess.run(['bootc', 'switch', '--enforce-container-sigpolicy', reference], check=True)
+        subprocess.run(['bootc', 'switch', '--enforce-container-sigpolicy', reference],
+                       check=True, env=environment)
     else:
-        subprocess.run(['bootc', 'upgrade'], check=True)
+        subprocess.run(['bootc', 'upgrade'], check=True, env=environment)
 
 
 def main():
-    reference = Path('/usr/share/gniri/image-reference').read_text().strip()
-    status = json.loads(subprocess.check_output(['bootc', 'status', '--json']))
-    stage_update(reference, status)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--status', action='store_true', help='Show last attempt and current deployments')
+    args = parser.parse_args()
+    if args.status:
+        print(STATE.read_text() if STATE.exists() else 'No update check has been recorded.')
+        subprocess.run(['bootc', 'status'], check=True)
+        return 0
+    if os.geteuid() != 0:
+        parser.error('Run with sudo, or use --status to inspect update state.')
+    try:
+        reference = REFERENCE_FILE.read_text().strip()
+        if PAUSE.exists():
+            raise UpdateSkipped('Updates paused by /etc/gniri/updates-paused.')
+        if not reference.startswith('ghcr.io/'):
+            raise UpdateSkipped('Local development image: registry updates are unavailable.')
+        environment = policy_environment(reference)
+        status = json.loads(subprocess.check_output(['bootc', 'status', '--json']))
+        stage_update(reference, status, environment)
+        status = json.loads(subprocess.check_output(['bootc', 'status', '--json']))
+        staged = status['status'].get('staged')
+        message = ('Verified deployment staged; reboot manually when ready.' if staged else
+                   'Verified update check completed; no reboot is needed.')
+        digest = staged.get('image', {}).get('imageDigest') if staged else None
+        save_state(STATE, 'success', message, staged_digest=digest)
+        print(message)
+        return 0
+    except UpdateSkipped as error:
+        save_state(STATE, 'skipped', str(error))
+        print(error)
+        return 0
+    except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
+        save_state(STATE, 'failed', str(error))
+        print(f'Update failed: {error}', flush=True)
+        return 1
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

@@ -1,5 +1,6 @@
 # x86_64 host image; ARM machines are guests, not an additional host variant.
-FROM quay.io/fedora/fedora-bootc:45@sha256:a875759195440409b74325a6bfec156bc3d2401b48a9d6d043bc82ea7f70d5d0
+ARG BASE_IMAGE=quay.io/fedora/fedora-bootc:latest@sha256:1543ba2788ee2055e0d44a8d879c79a2f527326600eca95a5f673414a48ff73c
+FROM ${BASE_IMAGE}
 
 # Frequently changed defaults are copied AFTER the expensive RPM transaction.
 COPY packages/*.txt /run/gniri-build/packages/
@@ -14,15 +15,19 @@ RUN --mount=type=cache,target=/var/cache/gniri,sharing=locked \
 # Metadata must not invalidate the expensive package/download layers.
 ARG IMAGE_REF=localhost/gniri:development
 ARG SOURCE_URL=""
+ARG SOURCE_REVISION="unknown"
+ARG BASE_IMAGE
 LABEL containers.bootc="1" \
       org.opencontainers.image.title="Gniri" \
       org.opencontainers.image.description="Minimal GNOME and Niri on Fedora bootc" \
-      org.opencontainers.image.source="${SOURCE_URL}"
+      org.opencontainers.image.source="${SOURCE_URL}" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}" \
+      org.opencontainers.image.base.name="${BASE_IMAGE}"
 COPY system_files/ /
 COPY trust/ /run/gniri-build/trust/
 COPY packages/visible-applications.allow /run/gniri-build/packages/
-COPY build/configure-image.py build/validate-image.sh build/validate-hardware.py build/finalize-image.py /run/gniri-build/
-RUN python3 /run/gniri-build/configure-image.py "${IMAGE_REF}" \
+COPY build/configure-image.py build/signature-policy.py build/validate-image.sh build/validate-hardware.py build/finalize-image.py /run/gniri-build/
+RUN python3 /run/gniri-build/configure-image.py "${IMAGE_REF}" "${BASE_IMAGE}" "${SOURCE_REVISION}" \
     && bash /run/gniri-build/validate-image.sh \
     && python3 /run/gniri-build/finalize-image.py \
     && bootc container lint --fatal-warnings

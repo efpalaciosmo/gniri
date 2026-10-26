@@ -22,6 +22,17 @@ inspection = json.loads(subprocess.check_output(['bootc', 'container', 'inspect'
 assert not {'selinux=0', 'enforcing=0'}.intersection(inspection['kargs']), 'Do not weaken SELinux in the desktop payload'
 kernel = inspection['kernel']
 assert kernel and kernel['unified'] is False, 'Keep the stock kernel/initramfs boot path, not a custom UKI'
+reference = Path('/usr/share/gniri/image-reference').read_text().strip()
+if reference.startswith('ghcr.io/'):
+    policy = json.loads(Path('/usr/share/gniri/bootc-policy.json').read_text())
+    assert policy['default'] == [{'type': 'reject'}], 'bootc must not inherit an insecure policy default'
+    repository = reference.rsplit(':', 1)[0]
+    assert set(policy['transports']['docker']) == {repository}
+    assert policy['transports']['docker'][repository] == [{
+        'type': 'sigstoreSigned', 'keyPath': '/usr/share/gniri/keys/cosign.pub',
+        'signedIdentity': {'type': 'matchRepository'},
+    }]
+    assert Path('/usr/share/gniri/keys/cosign.pub').stat().st_size > 0
 PY
 rpm -q bootupd shim-x64 grub2-efi-x64 kernel-core composefs
 python3 /run/gniri-build/validate-hardware.py
@@ -41,10 +52,11 @@ done
 [[ -f /usr/share/wayland-sessions/niri.desktop ]]
 [[ -f /usr/share/wayland-sessions/gnome.desktop ]]
 [[ -f /usr/share/xdg-desktop-portal/niri-portals.conf ]]
-rpm -q f45-backgrounds-base f45-backgrounds-gnome gnome-backgrounds
-[[ -s /usr/share/gnome-background-properties/f45.xml ]]
-[[ -s /usr/share/backgrounds/f45/default/f45-01-day.jxl ]]
-[[ -s /usr/share/backgrounds/f45/default/f45-01-night.jxl ]]
+source /usr/lib/os-release
+rpm -q "f${VERSION_ID}-backgrounds-base" "f${VERSION_ID}-backgrounds-gnome" gnome-backgrounds
+[[ -s /usr/share/gnome-background-properties/f${VERSION_ID}.xml ]]
+[[ -s /usr/share/backgrounds/f${VERSION_ID}/default/f${VERSION_ID}-01-day.jxl ]]
+[[ -s /usr/share/backgrounds/f${VERSION_ID}/default/f${VERSION_ID}-01-night.jxl ]]
 # Niri/Kitty load EGL/GLES/GL at runtime: ldd on the main executable alone
 # cannot prove these libraries are usable. Do not silently accept missing dlopen
 # dependencies when installing without weak RPM dependencies.

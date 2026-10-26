@@ -7,6 +7,9 @@ import re
 import shutil
 import subprocess
 import sys
+import runpy
+
+signature_policies = runpy.run_path('/run/gniri-build/signature-policy.py')['signature_policies']
 
 reference = sys.argv[1]
 if not re.fullmatch(r'(localhost/gniri:development|ghcr\.io/[a-z0-9._/-]+:[a-z0-9._-]+)', reference):
@@ -28,11 +31,9 @@ if reference.startswith('ghcr.io/'):
     # Fedora ships its default under /usr/share; preserve any /etc override.
     policy_source = policy_path if policy_path.exists() else Path('/usr/share/containers/policy.json')
     policy = json.loads(policy_source.read_text())
-    policy.setdefault('transports', {}).setdefault('docker', {})[repository] = [{
-        'type': 'sigstoreSigned', 'keyPath': '/usr/share/gniri/keys/cosign.pub',
-        'signedIdentity': {'type': 'matchRepository'},
-    }]
+    policy, bootc_policy = signature_policies(policy, repository)
     policy_path.write_text(json.dumps(policy, indent=2) + '\n')
+    (share / 'bootc-policy.json').write_text(json.dumps(bootc_policy, indent=2) + '\n')
     registries = Path('/etc/containers/registries.d')
     registries.mkdir(parents=True, exist_ok=True)
     (registries / 'gniri.yaml').write_text(f'docker:\n  {repository}:\n    use-sigstore-attachments: true\n')
@@ -41,13 +42,17 @@ if reference.startswith('ghcr.io/'):
 release = Path('/usr/lib/os-release')
 text = release.read_text()
 version = re.search(r'^VERSION_ID=(.+)$', text, flags=re.MULTILINE).group(1).strip('"')
-if version != '45':
-    raise SystemExit(f'Expected the Fedora 45 base, got {version}')
+if not version.isdecimal() or not re.search(r'^RELEASE_TYPE=["\']?stable["\']?$', text, re.MULTILINE):
+    raise SystemExit('The stable channel must contain a numbered, released Fedora base, not Rawhide.')
 text = re.sub(r'^PRETTY_NAME=.*$', f'PRETTY_NAME="Gniri (Fedora {version})"', text, flags=re.MULTILINE)
 for key, value in (('VARIANT', '"Gniri"'), ('VARIANT_ID', 'gniri'), ('IMAGE_ID', 'gniri')):
     text = re.sub(rf'^{key}=.*\n?', '', text, flags=re.MULTILINE)
     text += f'\n{key}={value}\n'
 release.write_text(text)
+(share / 'build.json').write_text(json.dumps({
+    'channel': 'quay.io/fedora/fedora-bootc:latest', 'fedora_version': version,
+    'base_image': sys.argv[2], 'source_revision': sys.argv[3], 'image_reference': reference,
+}, indent=2) + '\n')
 
 for path in Path('/usr/bin').glob('gniri-*'):
     path.chmod(0o755)

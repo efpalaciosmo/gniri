@@ -1,4 +1,5 @@
-FROM quay.io/fedora/fedora-bootc:45@sha256:a875759195440409b74325a6bfec156bc3d2401b48a9d6d043bc82ea7f70d5d0
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
 ARG PAYLOAD_REF
 ARG TARGET_REF
 COPY installer/prepare.sh /run/gniri-installer-prepare.sh
