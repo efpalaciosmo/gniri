@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "devops-automation": {
+      "source": "claude-office-skills/skills",
+      "sourceType": "github",
+      "skillPath": "devops-automation/SKILL.md",
+      "computedHash": "5b10e70bef82a107f098973a536cc914c56020acee67592ba27cd4860178b6b4"
+    },
+    "fedora-linux-triage": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/fedora-linux-triage/SKILL.md",
+      "computedHash": "9f66d011d7eeead88eb55b047607225407dfb3e3f7b33e5678f83c72207cce4f"
+    },
+    "github-actions": {
+      "source": "callstackincubator/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/github-actions/SKILL.md",
+      "computedHash": "c90128be4f55bc8b6dbdcba75ba2a540f3fb89ba91be1ccbe487e01ea70be122"
+    }
+  }
+}
