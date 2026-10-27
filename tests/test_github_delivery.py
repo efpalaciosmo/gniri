@@ -235,6 +235,29 @@ elif sys.argv[2] == 'upload':
 
 
 class DeliveryWorkflowTests(unittest.TestCase):
+    def test_manual_iso_requires_an_explicit_digest_without_a_stable_fallback(self):
+        workflow = (ROOT / '.github/workflows/iso.yml').read_text()
+        dispatch = workflow.split('  workflow_dispatch:', 1)[1].split('\npermissions:', 1)[0]
+        self.assertIn('required: true', dispatch)
+        self.assertNotIn('skopeo inspect', workflow)
+        self.assertLess(workflow.index('name: Validate candidate digest'), workflow.index('uses: actions/checkout'))
+        self.assertIn('digest="$PAYLOAD_DIGEST"', workflow)
+
+    def test_iso_input_precheck_rejects_missing_or_invalid_digests_with_recovery(self):
+        workflow = (ROOT / '.github/workflows/iso.yml').read_text()
+        step = workflow.split('      - name: Validate candidate digest\n', 1)[1].split('      - ', 1)[0]
+        script = '\n'.join(line[10:] for line in step.split('        run: |\n', 1)[1].splitlines())
+        for digest in ('', 'stable', 'sha256:abc', 'sha256:' + 'A' * 64, DIGEST + '\n', DIGEST):
+            with self.subTest(digest=digest):
+                result = subprocess.run(['bash', '-e', '-c', script], text=True, capture_output=True,
+                                        env=dict(os.environ, PAYLOAD_DIGEST=digest))
+                if digest == DIGEST:
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                else:
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn('::error::', result.stdout)
+                    self.assertIn('Run that workflow first', result.stdout)
+
     def test_iso_is_connected_by_digest_only_after_a_trusted_build(self):
         build = (ROOT / '.github/workflows/build.yml').read_text()
         iso = (ROOT / '.github/workflows/iso.yml').read_text()

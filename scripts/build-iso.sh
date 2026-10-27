@@ -35,7 +35,13 @@ else
 fi
 base=$(podman image inspect --format '{{ index .Config.Labels "org.opencontainers.image.base.name" }}' "$payload")
 [[ $base =~ ^quay.io/fedora/fedora-bootc:latest@sha256:[a-f0-9]{64}$ ]] || {
-    printf 'Payload lacks a resolved stable base; rebuild it with make build.\n' >&2; exit 1;
+    printf 'Payload %s lacks a resolved stable base (base.name=%s).\n' "$payload" "$base" >&2
+    if [[ $payload == localhost/gniri:development ]]; then
+        printf 'Rebuild it with make build.\n' >&2
+    else
+        printf 'Run Build and publish Gniri, then use its signed candidate digest as payload_digest for Build installer ISO. Re-running an old digest or selecting stable cannot add missing metadata.\n' >&2
+    fi
+    exit 1
 }
 fresh_args=()
 if [[ ${4:-0} == 1 ]]; then fresh_args+=(--no-cache); fi

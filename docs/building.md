@@ -167,8 +167,13 @@ pruebas reales → PR de evidencia → aprobación del entorno stable
    `gniri-candidate-inventory-ATTEMPT` y `gniri-iso-logs-ATTEMPT`.
    Cada reejecución usa nombres distintos; no mezcles artefactos de intentos diferentes.
 4. **Build installer ISO** sigue disponible manualmente desde `main` para generar
-   una ISO de otro candidato (`payload_digest`); vacío selecciona el `stable`
-   actual. También registra su propio run/intento y puede proporcionar una ISO
+   una ISO de otro candidato: `payload_digest` es obligatorio y debe ser el digest
+   exacto de un candidato firmado creado por **Build and publish Gniri**. No hay
+   fallback a `stable`: puede seguir apuntando a una imagen antigua sin los metadatos
+   de base resuelta que necesita el instalador. Si falta esa base, construye un
+   candidato nuevo; reejecutar la ISO con el digest antiguo no lo modifica. No se
+   debe promover a `stable` para poder construir la ISO de un candidato.
+   También registra su propio run/intento y puede proporcionar una ISO
    revisada para promoción. La alternativa local, no apta para esta promoción
    basada en artefactos Actions, es:
 

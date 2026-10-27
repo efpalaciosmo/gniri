@@ -58,6 +58,27 @@ class IsoReferencesTests(unittest.TestCase):
         self.assertIn('cosign verify --new-bundle-format=false --key trust/cosign.pub', workflow)
         self.assertIn('bash scripts/build-iso.sh "$image@$digest" "$image:stable"', workflow)
 
+    def test_legacy_payload_base_is_rejected_with_the_correct_rebuild_instructions(self):
+        script = (ROOT / 'scripts/build-iso.sh').read_text()
+        guard = 'base=$(' + script.split('base=$(', 1)[1].split('\nfresh_args=()', 1)[0]
+        valid = f'quay.io/fedora/fedora-bootc:latest@{DIGEST}'
+        for payload in (LOCAL, f'{REMOTE}@{DIGEST}'):
+            for base in ('', '<no value>', 'quay.io/fedora/fedora-bootc:latest',
+                         f'quay.io/fedora/fedora-bootc:45@{DIGEST}', valid):
+                with self.subTest(payload=payload, base=base):
+                    result = subprocess.run([
+                        'bash', '-eu', '-c',
+                        'podman() { printf "%s\\n" "$MOCK_BASE"; };\n' + guard + '\nprintf "%s" "$base"',
+                    ], env=dict(os.environ, payload=payload, MOCK_BASE=base), text=True, capture_output=True)
+                    if base == valid:
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertEqual(result.stdout, valid)
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertIn(payload, result.stderr)
+                        self.assertIn('lacks a resolved stable base', result.stderr)
+                        self.assertIn('make build' if payload == LOCAL else 'signed candidate digest', result.stderr)
+
     def test_generic_iso_has_required_builder_rootfs_metadata(self):
         script = (ROOT / 'scripts/build-iso.sh').read_text()
         self.assertIn('--bootc-default-fs ext4', script)

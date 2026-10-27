@@ -10,8 +10,8 @@ on:
   workflow_dispatch:
     inputs:
       payload_digest:
-        description: Signed candidate sha256 digest (empty selects current stable)
-        required: false
+        description: Exact signed candidate sha256 digest from Build and publish Gniri
+        required: true
         type: string
 
 permissions:
@@ -28,6 +28,14 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
+      - name: Validate candidate digest
+        env:
+          PAYLOAD_DIGEST: ${{ inputs.payload_digest }}
+        run: |
+          if [[ ! $PAYLOAD_DIGEST =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo '::error::Provide payload_digest from Build and publish Gniri. Run that workflow first to create a current signed candidate; stable may still contain a legacy image without resolved base metadata.'
+            exit 1
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -56,10 +64,6 @@ jobs:
           printf '%s' "$REGISTRY_TOKEN" | sudo podman login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           printf '%s' "$REGISTRY_TOKEN" | cosign login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           digest="$PAYLOAD_DIGEST"
-          if [[ -z $digest ]]; then
-            digest=$(sudo skopeo inspect --format '{{.Digest}}' "docker://$image:stable")
-          fi
-          [[ $digest =~ ^sha256:[a-f0-9]{64}$ ]]
           cosign verify --new-bundle-format=false --key trust/cosign.pub "$image@$digest"
           sudo env "PATH=$PATH" "DOCKER_CONFIG=$HOME/.docker" \
             bash scripts/build-iso.sh "$image@$digest" "$image:stable" '' 1
