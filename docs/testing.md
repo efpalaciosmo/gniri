@@ -42,6 +42,43 @@ los logins del host no se heredan y las credenciales no se incluyen en la imagen
 Un error DNS/autenticación no cuenta como rechazo de firma. El precheck offline
 **no** sustituye la prueba de actualización/rechazo con bootc en una VM arrancada.
 
+Antes de publicar, CI ejecuta también una regresión real de transporte, incluso
+en pull requests y sin acceso externo. Se puede repetir localmente:
+
+```sh
+podman run --rm --network=none --entrypoint python3 \
+  -v "$PWD:/src:ro" localhost/gniri:development /src/tests/signature-transport-smoke.py
+```
+
+Usa el Skopeo de la imagen Fedora, un registro HTTPS en loopback con autenticación
+y claves ECDSA temporales. Reproduce el error original de copiar firmas a un
+destino `oci:` y ejecuta `signature-smoke.sh`: acepta la firma confiable, rechaza
+unsigned/wrong-key y falla ante manifests ausentes, errores al descargar firmas,
+credenciales inválidas o una política debilitada. Comprueba además los digests
+del manifest y blobs exportados. `copy --remove-signatures` evita **exportar** las
+firmas a OCI (no soportado); `--policy` sigue verificando el origen antes de copiar.
+No debe usarse `--insecure-policy` ni cambiar la política instalada para resolverlo.
+La regresión sustituye política/clave/auth **solo dentro del contenedor desechable**;
+no modifica la imagen original, el host, el firewall ni SELinux. Al salir, `--rm`
+elimina esos fixtures. No usa claves de producción ni tokens GitHub y no reemplaza
+la prueba GHCR del candidato firmado real ni las pruebas bootc en VM.
+
+### Diagnóstico del fallo de publicación 40430420740
+
+El [job build 121946453172](https://github.com/efpalaciosmo/gniri/actions/runs/40430420740/job/121946453172)
+construyó y firmó el candidato, pero falló en `signature-smoke.sh` al copiarlo a
+`oci:/var/tmp/signed-policy-test`: `Pushing signatures for OCI images is not supported`.
+No fue un fallo de DNF, arranque, SELinux ni verificación Cosign. El inventario del
+run registra Fedora 44, `skopeo-1.22.3-1.fc44` y `containers-common-0.67.2-1.fc44`;
+la reproducción local con esas mismas versiones falló antes del cambio y pasó
+con `--remove-signatures`, conservando los rechazos criptográficos negativos.
+
+Referencias upstream: [skopeo-copy, `--remove-signatures`](https://github.com/containers/skopeo/blob/main/docs/skopeo-copy.1.md),
+[verificación de política antes de copiar](https://github.com/containers/image/blob/main/copy/single.go)
+y [comprobación de firmas del destino](https://github.com/containers/image/blob/main/copy/sign.go).
+La prueba local no certifica que una ejecución posterior de GitHub, la ISO o una
+instalación hayan pasado: esos resultados necesitan sus propios logs y evidencia.
+
 El pipeline de `main` genera después la ISO del digest firmado y adjunta un
 `validation.json` con checksum, revisión y run/intento exactos, **sin marcar ensayos
 como aprobados**. Usa ese archivo para la evidencia revisada. La promoción descarga

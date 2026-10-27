@@ -5,13 +5,15 @@ set -euo pipefail
 authfile=/run/registry-auth.json
 [[ -s $authfile ]]
 policy=/usr/share/gniri/bootc-policy.json
-skopeo --policy "$policy" copy --authfile "$authfile" "docker://$1" oci:/var/tmp/signed-policy-test
+# OCI directories cannot store registry signatures. This only suppresses copying
+# them to the destination: --policy still verifies the source before copying.
+skopeo --policy "$policy" copy --authfile "$authfile" --remove-signatures "docker://$1" oci:/var/tmp/signed-policy-test
 reject() {
     local reference=$1 expected=$2
     # Prove the image is reachable: a DNS/auth/not-found failure is not a valid
     # negative signature test. Inspect alone does not verify image signatures.
     skopeo inspect --authfile "$authfile" "docker://$reference" >/dev/null
-    if skopeo --policy "$policy" copy --authfile "$authfile" "docker://$reference" oci:/var/tmp/rejected-policy-test \
+    if skopeo --policy "$policy" copy --authfile "$authfile" --remove-signatures "docker://$reference" oci:/var/tmp/rejected-policy-test \
         > /var/tmp/gniri-signature-error.log 2>&1; then
         printf 'ERROR: an unsigned or wrong-key image was accepted: %s\n' "$reference" >&2
         exit 1

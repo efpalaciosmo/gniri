@@ -66,6 +66,11 @@ jobs:
           sudo podman run --rm --network=none --entrypoint bash \
             -v "$PWD/tests/flatpak-smoke.sh:/run/flatpak-smoke.sh:ro" \
             localhost/gniri:build /run/flatpak-smoke.sh
+      - name: Offline signature transport regression
+        run: |
+          sudo podman run --rm --network=none --entrypoint python3 \
+            -v "$PWD:/src:ro" \
+            localhost/gniri:build /src/tests/signature-transport-smoke.py
       - name: Export package and launcher inventory
         run: |
           mkdir -p output/inventory
