@@ -173,6 +173,10 @@ pruebas reales → PR de evidencia → aprobación del entorno stable
    `gniri-candidate-inventory-ATTEMPT` incluyen `image-size.json`: tamaño sin
    comprimir y bytes gzip de las capas. El repacking descarta los blobs temporales.
    Descarga con `docker pull ghcr.io/efpalaciosmo/gniri:latest` o `podman pull`.
+   Si el paquete es privado, inicia sesión antes con `docker login ghcr.io -u OWNER`
+   (o `podman login`) usando un token clásico con `read:packages` como contraseña.
+   El repositorio público no implica que su paquete GHCR sea público; consulta la
+   configuración inicial para habilitar descargas anónimas.
    GitHub puede retrasar el inicio programado durante períodos de alta carga.
 2. El job ISO se activa únicamente en ejecuciones manuales con **`build_iso=true`**.
    Usa **el digest exacto** del job de imagen, en otro runner para

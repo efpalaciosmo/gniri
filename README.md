@@ -48,6 +48,12 @@ docker pull ghcr.io/efpalaciosmo/gniri:latest
 # También: podman pull ghcr.io/efpalaciosmo/gniri:latest
 ```
 
+Si el paquete es privado, ejecuta antes `docker login ghcr.io -u efpalaciosmo`
+(o `podman login`) y usa como contraseña un token clásico de GitHub con
+[`read:packages`](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic).
+Para descargas sin credenciales, la [configuración inicial](docs/building.md#github-configuración-inicial)
+explica cómo hacer público el paquete.
+
 `latest` es el candidato más reciente; las instalaciones siguen el canal revisado
 `stable`. El único workflow permite generar la ISO x86_64 marcando `build_iso` en
 una ejecución manual. Tras pruebas reales y promoción aprobada, publica el mismo
