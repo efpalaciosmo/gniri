@@ -36,15 +36,15 @@ class IsoReferencesTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertNotEqual(self.validate(value, value).returncode, 0)
 
-    def test_make_iso_defaults_to_the_local_recipe(self):
+    def test_make_iso_defaults_to_the_published_registry_channel(self):
         result = subprocess.run(['make', '-n', 'iso'], cwd=ROOT, text=True,
                                 capture_output=True, check=True)
-        self.assertIn('build IMAGE=localhost/gniri:development', result.stdout)
-        self.assertIn('bash scripts/build-local-iso.sh', result.stdout)
-        self.assertNotIn('ghcr.io/owner/gniri', result.stdout)
+        self.assertIn("bash scripts/build-published-iso.sh 'ghcr.io/efpalaciosmo/gniri:stable'", result.stdout)
+        self.assertNotIn('scripts/build-local-iso.sh', result.stdout)
+        self.assertNotIn('build IMAGE=localhost', result.stdout)
 
     def test_host_network_is_opt_in_and_reaches_all_build_stages(self):
-        result = subprocess.run(['make', '-n', 'iso', 'BUILD_NETWORK=host'], cwd=ROOT,
+        result = subprocess.run(['make', '-n', 'iso-local', 'BUILD_NETWORK=host'], cwd=ROOT,
                                 text=True, capture_output=True, check=True)
         self.assertIn('--network "host"', result.stdout)
         self.assertIn('GNIRI_BUILD_NETWORK="host" GNIRI_REFRESH="0" bash scripts/build-local-iso.sh', result.stdout)

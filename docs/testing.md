@@ -22,6 +22,27 @@ si están instalados. CI instala y exige los dos linters. `check-desktop` usa
 Weston/software rendering en un contenedor desechable sin GPU/display del host;
 confirma una ventana Ghostty en Niri, no GDM, logind, SELinux ni DRM físico.
 
+La construcción comprueba además NSS y ejecuta Bash y `ghostty +version` con
+UID sin privilegios. Esto detecta defaults/directorios inaccesibles que los
+checks como root pueden ocultar. La instalación del overlay fija permisos sin
+importar un `umask 077` del checkout y conserva los de directorios compartidos
+de Fedora. Las pruebas de autorización ejecutan el JavaScript polkit con Node.js
+si está disponible: cubren administradores locales activos y rechazos por
+grupo, sesión o acción ajena. No sustituyen una comprobación de polkit/logind
+en un escritorio arrancado.
+
+El gate de migración debe partir también de una instalación Atomic existente:
+registrar cuenta/UID/grupos/shell antes del rebase y comprobarlos después, junto
+con acceso al hogar, GDM, ambas sesiones y apertura del terminal como usuario
+normal. Una prueba de contenedor o una instalación nueva no valida ese rebase.
+
+`tests/installer-finalize-smoke.py` comprueba además el origen firmado por la API
+real de OSTree y su lectura posterior, antes del primer arranque. El gate de
+promoción exige `rebase-accounts` además de los logins, Secure Boot y actualización/
+rollback. `tests/booted-smoke.py` puede ejecutarse desde cada sesión normal de
+una VM instalada para registrar comprobaciones de cuentas, escritorio y origen;
+no marca como probados hardware, backup o transiciones que no ejecutó.
+
 `check-installer` ejecuta tareas reales Anaconda/OSTree sobre tmpfs: layouts de
 home/var/EFI y `/boot`, readback de argumentos, preservación de `fstab` tras fallo
 e idempotencia. No usa particionador ni discos. `label=disable` afecta solo al
@@ -79,9 +100,10 @@ y [comprobación de firmas del destino](https://github.com/containers/image/blob
 La prueba local no certifica que una ejecución posterior de GitHub, la ISO o una
 instalación hayan pasado: esos resultados necesitan sus propios logs y evidencia.
 
-El pipeline de `main` publica únicamente la imagen firmada en GHCR y sus
-inventarios. Las ISOs se generan y prueban localmente con `make iso` o
-`make iso-published`; el workflow no crea ISOs ni ejecuta promociones. Los helpers
+El pipeline de construcción de `main` publica únicamente candidatos firmados e
+inventarios. Las ISOs se generan y prueban localmente con `make iso-candidate`,
+`make iso` o `make iso-published`. El workflow separado `promote.yml` exige el
+registro revisado y aprobación en `stable`; no construye otra imagen. Los helpers
 de release conservados validan la identidad y bytes de artefactos existentes.
 Sus unit tests usan bytes simulados; no crean una release ni validan un arranque.
 
@@ -154,3 +176,34 @@ Validación del working tree basado en `fad8ad8`, **no una release**:
 
 Los diagnósticos antiguos y sus detalles permanecen en el historial Git, no como
 guías vigentes ni evidencia para futuros candidatos.
+
+## Validación local de las correcciones: 2026-10-28
+
+Working tree basado en `7f18449`, con cambios locales todavía sin publicar:
+
+- `GNIRI_STRICT_CHECKS=1 make check`: 155 tests, 154 aprobados y uno omitido
+  por falta de Niri local; ShellCheck/actionlint aprobados. Incluye avance de
+  versión Fedora, rechazo de retrocesos, canales, resolución de ISO, preflight
+  de rebase y controles de promoción.
+- Regresión real de OSTree sobre tmpfs: origen firmado guardado/leído antes
+  del arranque, kernel arguments/fstab preservados e idempotencia con `/boot`
+  separado y sin separar. Se reprodujo el fallo esperado de `/boot` de sólo
+  lectura sin perder `fstab`; no se montaron discos del anfitrión.
+- Imagen **derivada para validar configuración**, aplicando los cambios al
+  digest `97722614446398e2d5f09917f9fb3700ac04fe293b97fc5ffc04cfd696a686b9`
+  ya descargado: validadores de imagen y 14 checks bootc aprobados, un skip
+  upstream. Se corrigió la regeneración de tmpfiles para no perder reglas
+  anteriores de `/var`. Esto reutiliza paquetes existentes, no equivale a una
+  construcción fresca desde el canal Fedora.
+- En esa imagen derivada pasaron Flathub de usuario offline, el precheck real
+  de política estricta y las regresiones de transporte con aceptación de la
+  firma correcta y rechazo de unsigned/wrong-key, errores de firma, auth y
+  políticas debilitadas. Los rechazos impresos son resultados negativos esperados.
+- El build fresco resolvió `quay.io/fedora/fedora-bootc:latest`, verificó Fedora
+  44 estable y alcanzó DNF, pero la política de red bloqueó sus mirrors.
+  Cosign/GitHub quedaron bloqueados por los dominios TUF/API. Se guardaron los
+  destinos necesarios en el borrador del entorno; no se desactivó verificación.
+- **Pendientes:** build fresco e ISO, verificación remota de firmas/protecciones,
+  GDM/sesiones arrancadas, migración desde Dakota con cuenta existente, Secure
+  Boot, actualización/rollback y hardware. No se promovió ni modificó un tag
+  remoto y no se generó un registro de aprobación de producción.

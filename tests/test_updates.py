@@ -1,6 +1,7 @@
 import copy
 from pathlib import Path
 import runpy
+import json
 import unittest
 from unittest.mock import patch
 
@@ -43,6 +44,30 @@ class UpdateTests(unittest.TestCase):
         with patch('subprocess.run') as run, self.assertRaises(UPDATES['UpdateSkipped']):
             UPDATES['stage_update'](REFERENCE, status)
         run.assert_not_called()
+
+    def test_latest_tracks_its_installed_channel_without_switching_to_stable(self):
+        status = host()
+        for image in (status['spec']['image'], status['status']['booted']['image']['image']):
+            image['image'] = REFERENCE.replace(':stable', ':latest')
+        self.assertEqual(UPDATES['update_reference'](REFERENCE, status), REFERENCE.replace(':stable', ':latest'))
+        self.assertEqual(self.run_update(status)[0].args[0], ['bootc', 'upgrade'])
+
+    def test_pending_channel_switch_and_unknown_tags_are_not_overridden(self):
+        for tag in ('latest', 'custom', 'stable@sha256:' + 'a' * 64):
+            status = host()
+            status['spec']['image']['image'] = REFERENCE.replace(':stable', ':' + tag)
+            with self.subTest(tag=tag), self.assertRaises(UPDATES['UpdateSkipped']):
+                self.run_update(status)
+
+    def test_remote_fedora_must_not_downgrade_or_omit_version(self):
+        for version in ('43', '', 'rawhide', None, 45):
+            with self.subTest(version=version), patch('subprocess.check_output', return_value=json.dumps(
+                    {'Labels': {'org.opencontainers.image.version': version}})), self.assertRaises(ValueError):
+                UPDATES['check_version'](REFERENCE, '44', {})
+        for version in ('44', '45'):
+            with patch('subprocess.check_output', return_value=json.dumps(
+                    {'Labels': {'org.opencontainers.image.version': version}})):
+                UPDATES['check_version'](REFERENCE, '44', {})
 
     def test_local_development_does_not_contact_registry(self):
         with patch('subprocess.run') as run, self.assertRaises(UPDATES['UpdateSkipped']):

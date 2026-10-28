@@ -33,6 +33,11 @@ flatpak_repo = Path('/var/lib/flatpak/repo')
 if flatpak_repo.exists():
     shutil.rmtree(flatpak_repo)
 
+# Regenerate our rules from the image's directories, not from our previous
+# output. Otherwise a derived/rebuilt image skips all old entries and then
+# overwrites the file that declared them, leaving /var without boot-time dirs.
+generated = Path('/usr/lib/tmpfiles.d/gniri-var.conf')
+generated.unlink(missing_ok=True)
 declared = set()
 configuration = subprocess.check_output(['systemd-tmpfiles', '--cat-config'], text=True)
 for line in configuration.splitlines():
@@ -52,7 +57,7 @@ for root, dirs, _ in os.walk('/var', followlinks=False):
         info = path.stat()
         user, group = pwd.getpwuid(info.st_uid).pw_name, grp.getgrgid(info.st_gid).gr_name
         rules.append(f'd {path} {stat.S_IMODE(info.st_mode):04o} {user} {group} - -')
-Path('/usr/lib/tmpfiles.d/gniri-var.conf').write_text('\n'.join(rules) + '\n')
+generated.write_text('\n'.join(rules) + '\n')
 for name in ('/run/dnf', '/run/gluster', '/run/selinux-policy', '/run/gniri-build'):
     path = Path(name)
     if path.exists():

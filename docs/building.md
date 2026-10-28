@@ -9,6 +9,14 @@ no hay que editar números de versión. El instalador reutiliza la base grabada
 en el payload; no resuelve otro `latest`. Esto no garantiza transiciones sin
 mantenimiento ni autoriza degradar una instalación desde una versión más nueva.
 
+`fedora:latest` es un contenedor de aplicaciones, no la base arrancable elegida.
+No se fija `:44`, `:45` ni otro número: el siguiente build vuelve a resolver
+`quay.io/fedora/fedora-bootc:latest`. Antes de instalar paquetes se verifica
+`ID=fedora`, `RELEASE_TYPE=stable` y una versión numérica. Esa versión se conserva
+en el label OCI y en `build.json`; las promociones y las actualizaciones la
+comprueban para rechazar retrocesos. El paso a la siguiente Fedora se distribuye
+cuando el candidato correspondiente supera las pruebas y la revisión de `stable`.
+
 Se conserva OSTree con composefs, raíz física de solo lectura y estado persistente
 en `/etc` y `/var`. La cadena firmware → shim → GRUB → kernel es la de Fedora;
 no hay UKI propio ni backend composefs nativo. `enabled=yes` no autentica por sí
@@ -37,7 +45,8 @@ espacio para imágenes, cachés y staging de varios GB. La ISO requiere `sudo` y
 ```sh
 make check
 make build              # Solo imagen: localhost/gniri:development.
-make iso                # Construye la imagen y genera la ISO local; pide sudo.
+make iso-local          # ISO de desarrollo sin actualizaciones de registro.
+make iso                # ISO del stable firmado publicado; necesita Skopeo y Cosign.
 ```
 
 | Opción | Uso |
@@ -64,9 +73,15 @@ si quieres reutilizar capas y cachés.
 
 ## ISO e instalación
 
-`make iso` (`make iso-local`) no requiere GitHub, publicación ni Cosign, pero
-instala una imagen **de desarrollo sin origen de actualizaciones**. Para uso
-permanente usa una imagen publicada, firmada y [validada](testing.md).
+`make iso` resuelve `ghcr.io/efpalaciosmo/gniri:stable` a un digest y verifica su
+firma antes de generar el instalador. `UPDATE_REF` permite elegir otro
+repositorio GHCR terminado en `:stable`. Requiere Skopeo, Cosign y la clave pública
+de un checkout confiable; no necesita credenciales si el paquete es público.
+Se conservan el origen GHCR y la exigencia de firma desde el primer arranque.
+
+`make iso-local` instala deliberadamente `localhost/gniri:development` y no tiene
+actualizaciones de registro. Se reserva para desarrollo; publicar una imagen
+posteriormente no cambia el origen de una instalación existente.
 
 Podman de usuario y root tienen almacenes separados: la receta transfiere el
 payload por una tubería y exporta un directorio OCI temporal en disco. Anaconda
@@ -122,8 +137,8 @@ scripts. Protege `main` con revisión y checks requeridos de sintaxis/tests e im
 
 ## Pipeline de imagen en GHCR
 
-[`.github/workflows/build.yml`](../.github/workflows/build.yml) es el único
-workflow del repositorio y contiene un solo job, `build`. Se ejecuta por cambios
+[`.github/workflows/build.yml`](../.github/workflows/build.yml) contiene el job
+de candidatos `build`. Se ejecuta por cambios
 de código en `main`, por pull requests, manualmente sin parámetros y los sábados
 a las **05:00 de Bogotá (10:00 UTC)**. GitHub puede retrasar el inicio programado
 durante períodos de alta carga.
@@ -139,7 +154,7 @@ Las PR no publican ni usan secretos de firma. Desde `main`, el mismo job renueva
 las transacciones RPM, construye, repackea y valida Ghostty/Niri, Flatpak y
 políticas de firmas. Publica un candidato inmutable
 `sha-COMMIT-RUN_ID-ATTEMPT`, lo firma y verifica en GHCR; después actualiza `:latest`
-al mismo digest. No hay jobs de ISO, promoción, deployments ni GitHub Releases.
+al mismo digest. Este workflow no modifica `stable`, no construye ISOs ni crea Releases.
 
 El resumen incluye el comando de descarga, digest y tamaños. El artefacto
 `gniri-candidate-inventory-ATTEMPT` contiene inventarios de paquetes/lanzadores,
@@ -153,8 +168,13 @@ docker pull ghcr.io/efpalaciosmo/gniri:latest
 
 `:latest` identifica la imagen firmada más reciente. El workflow no actualiza
 `:stable`: ese canal requiere evidencia específica revisada y el entorno
-protegido `stable`; no hay promoción automática ni manual en el workflow actual.
-Las instalaciones que ya siguen `:stable` conservan esa referencia.
+protegido `stable`. El workflow manual `promote.yml` valida un registro revisado
+de `release-evidence/`, el run exacto de construcción, las firmas de candidato y
+stable, la procedencia y la versión de Fedora. El job de publicación necesita
+aprobación humana y copia el mismo manifest conservando su digest. Repite las
+validaciones tras la aprobación y se detiene si `stable` cambió entretanto.
+Las instalaciones que ya siguen `:stable` conservan esa referencia; las de
+prueba que siguen `:latest` conservan `:latest`, sin saltar de canal automáticamente.
 
 Las herramientas locales de ISO siguen disponibles. Para crear una ISO de un
 candidato publicado y firmado, usa su digest exacto:

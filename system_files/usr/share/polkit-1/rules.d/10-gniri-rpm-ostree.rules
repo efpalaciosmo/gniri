@@ -1,0 +1,25 @@
+// Desktop administrators may manage deployments without a root-password prompt.
+// Keep other polkit actions and remote/inactive sessions on Fedora's defaults.
+polkit.addRule(function(action, subject) {
+    var actions = [
+        "org.projectatomic.rpmostree1.client-management",
+        "org.projectatomic.rpmostree1.repo-refresh",
+        "org.projectatomic.rpmostree1.upgrade",
+        "org.projectatomic.rpmostree1.deploy",
+        "org.projectatomic.rpmostree1.rebase",
+        "org.projectatomic.rpmostree1.rollback",
+        "org.projectatomic.rpmostree1.cleanup",
+        "org.projectatomic.rpmostree1.cancel",
+        "org.projectatomic.rpmostree1.install-uninstall-packages",
+        "org.projectatomic.rpmostree1.install-local-packages",
+        "org.projectatomic.rpmostree1.override",
+        "org.projectatomic.rpmostree1.bootconfig",
+        "org.projectatomic.rpmostree1.repo-modify",
+        "org.projectatomic.rpmostree1.reload-daemon",
+        "org.projectatomic.rpmostree1.finalize-deployment"
+    ];
+    if (subject.local && subject.active && subject.isInGroup("wheel") &&
+        actions.indexOf(action.id) !== -1) {
+        return polkit.Result.YES;
+    }
+});

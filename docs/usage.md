@@ -91,6 +91,14 @@ tag base Fedora. El domingo a las 10:00 local se prepara una actualización, con
 hasta 30 minutos de retraso. `Persistent=true` recupera ejecuciones perdidas al
 encender, sin despertar el equipo. **Nunca se reinicia automáticamente.**
 
+Gniri no queda fijado al número de Fedora instalado: los builds siguen
+`quay.io/fedora/fedora-bootc:latest`. Un candidato probado de la siguiente Fedora
+se promueve a `stable` sin cambiar tu referencia de actualización. Las máquinas
+de pruebas instaladas con `:latest` siguen ese canal explícitamente.
+Se rechaza un destino sin versión de Fedora o que anuncie una versión menor
+que la arrancada. La comprobación previa de versión no sustituye la firma: el
+despliegue sigue verificándose criptográficamente.
+
 ```sh
 gniri-stage-update --status
 sudo gniri-stage-update
@@ -106,7 +114,70 @@ El resultado, última comprobación correcta y digest preparado se guardan en
 funcione. No hay notificación gráfica: revisa el estado si falla la comprobación
 semanal. GNOME Software gestiona aparte las aplicaciones Flatpak.
 
+Las nuevas instalaciones publicadas guardan un origen firmado antes de su primer
+arranque. El daemon de rpm-ostree también usa la política estricta independiente,
+por lo que `rpm-ostree update` sigue el origen del deployment y verifica sus
+firmas. No pasa por la pausa ni por el registro de intentos del helper: esa pausa
+controla la tarea automática, no una actualización manual deliberada. No uses
+rebase a `latest` como reparación de una instalación antigua: primero compara
+versiones, conserva el deployment anterior y ensaya la migración en una copia.
+El nuevo código no modifica por sí solo un `stable` antiguo ni una instalación
+con origen local.
+
 ## Rollback y copias
+
+### Si desaparece la cuenta del login después de un rebase
+
+Antes de una migración nueva, desde el usuario de escritorio existente ejecuta
+`python3 scripts/check-rebase.py ghcr.io/efpalaciosmo/gniri:stable` desde un
+checkout confiable. Requiere Skopeo, Cosign y Podman. Verifica el digest firmado,
+la versión, que la cuenta sea local y que la imagen proporcione su shell y GDM;
+no cambia usuarios ni ejecuta el rebase. Que pase el preflight no sustituye la
+prueba de migración y recuperación en una copia desechable.
+
+El rebase debe conservar las cuentas locales, sus contraseñas y `/var/home`.
+Que GDM no muestre una cuenta o que el terminal no abra no demuestra que los
+datos se hayan borrado. Primero arranca el deployment anterior desde GRUB. No
+reinstales, recrees el usuario ni cambies UID, propietario o contraseña para
+intentar recuperar el escritorio sin identificar el fallo.
+
+Desde la sesión recuperada, comprueba la cuenta y su shell sin mostrar hashes:
+
+```sh
+getent passwd "$USER"
+id
+getent group wheel
+rpm-ostree status
+journalctl --list-boots
+```
+
+Identifica el arranque fallido en la última lista y sustituye `BOOT_ID`:
+
+```sh
+sudo journalctl -b BOOT_ID -u gdm.service -u accounts-daemon.service \
+  -u systemd-sysusers.service --no-pager -n 100
+```
+
+Si puedes acceder a una TTY del deployment afectado (`Ctrl+Alt+F3`), comprueba
+allí `getent passwd NOMBRE_USUARIO`, `id NOMBRE_USUARIO`, el ejecutable de shell
+indicado y `findmnt /home /var/home`. Una shell personalizada ausente en la
+imagen puede impedir abrir sesiones o terminales sin borrar la cuenta. No
+ejecutes `authselect --force`, no reemplaces `/etc/passwd` ni hagas `/usr`
+escribible como arreglo. Recuperar el login en el deployment anterior permite
+investigar sin alterar la cuenta; no garantiza que una imagen nueva ya la repare.
+
+### Autorización de rpm-ostree
+
+Las operaciones habituales de rpm-ostree no solicitan contraseña a un usuario
+del grupo `wheel` en una sesión **local y activa**. La regla del escritorio
+autoriza únicamente acciones enumeradas de rpm-ostree; no elimina la
+autenticación de sudo, de otros servicios ni de sesiones remotas/inactivas.
+Si sigue apareciendo una solicitud, guarda el comando exacto y comprueba `id`
+y `loginctl session-status` antes de modificar las políticas. El cambio debe
+estar incluido en la imagen arrancada; editar el repositorio no cambia una
+instalación existente. La validación criptográfica de imágenes se mantiene.
+
+### Preparar un rollback
 
 ```sh
 sudo systemctl disable --now bootc-fetch-apply-updates.timer

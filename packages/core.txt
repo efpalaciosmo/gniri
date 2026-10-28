@@ -8,8 +8,11 @@ fontconfig
 git
 glibc-langpack-en
 make
+nss-altfiles
 podman
 python3
+rpm-ostree
+skopeo
 stow
 tar
 traceroute

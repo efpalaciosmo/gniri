@@ -57,6 +57,16 @@ class StableBaseTests(unittest.TestCase):
         self.assertEqual(BASE['stable_base'](self.manifest()),
                          f'quay.io/fedora/fedora-bootc:latest@{DIGEST}')
 
+    def test_base_release_must_be_a_numbered_stable_fedora(self):
+        for version in ('44', '45', '46'):
+            release = f'ID=fedora\nVERSION_ID={version}\nRELEASE_TYPE="stable"\n'
+            self.assertEqual(BASE['fedora_version'](release), version)
+        for release in ('ID=fedora\nVERSION_ID=rawhide\nRELEASE_TYPE=development\n',
+                        'ID=ubuntu\nVERSION_ID=45\nRELEASE_TYPE=stable\n',
+                        'ID=fedora\nVERSION_ID=45\nRELEASE_TYPE=prerelease\n'):
+            with self.assertRaises(ValueError):
+                BASE['fedora_version'](release)
+
     def test_unknown_ambiguous_or_malformed_platforms_fail_closed(self):
         for manifest in (self.manifest('arm64'), self.manifest(digest='latest'),
                          {'manifests': self.manifest()['manifests'] * 2}):
@@ -67,13 +77,15 @@ class StableBaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary, contextlib.chdir(temporary), \
                 patch.object(sys, 'argv', ['build-image.py', 'localhost/gniri:test', '--reference',
                                           'localhost/gniri:development', '--network', 'host', '--fresh']), \
-                patch('subprocess.check_output', return_value=json.dumps(self.manifest())), \
+                patch('subprocess.check_output', side_effect=[json.dumps(self.manifest()),
+                      'ID=fedora\nVERSION_ID=45\nRELEASE_TYPE=stable\n']), \
                 patch('subprocess.run') as run:
             BASE['main']()
             command = run.call_args.args[0]
             self.assertIn('--no-cache', command)
             self.assertIn('--network=host', command)
             self.assertIn(f'BASE_IMAGE=quay.io/fedora/fedora-bootc:latest@{DIGEST}', command)
+            self.assertIn('FEDORA_VERSION=45', command)
             self.assertFalse(Path('output').exists(), 'Rootful CI must not create root-owned output here')
 
     def test_failed_channel_resolution_never_starts_a_build(self):
@@ -127,15 +139,19 @@ class UpdateStateTests(unittest.TestCase):
         reference.write_text(REPOSITORY + ':stable\n')
         policy = root / 'policy.json'
         policy.write_text(json.dumps(POLICIES['signature_policies']({}, REPOSITORY)[1]))
+        build = root / 'build.json'
+        build.write_text(json.dumps({'fedora_version': '44'}))
         pause = root / 'paused'
         if paused:
             pause.touch()
         main = UPDATES['main']
-        with patch.dict(main.__globals__, {'REFERENCE_FILE': reference, 'POLICY': str(policy),
+        with patch.dict(main.__globals__, {'REFERENCE_FILE': reference, 'BUILD_FILE': build, 'POLICY': str(policy),
                                           'PAUSE': pause, 'STATE': root / 'status.json'}), \
                 patch.object(sys, 'argv', ['gniri-stage-update']), \
                 patch('os.geteuid', return_value=0), \
-                patch('subprocess.check_output', return_value=json.dumps(status)) as inspect, \
+                patch('subprocess.check_output', side_effect=lambda command, **kwargs:
+                      json.dumps({'Labels': {'org.opencontainers.image.version': '45'}})
+                      if command[0] == 'skopeo' else json.dumps(status)) as inspect, \
                 patch('subprocess.run', side_effect=subprocess.CalledProcessError(1, ['bootc']) if failure else None) as run:
             result = main()
         return result, json.loads((root / 'status.json').read_text()), inspect, run

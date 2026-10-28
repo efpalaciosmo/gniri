@@ -11,6 +11,19 @@ spec.loader.exec_module(finalize)
 
 
 class RootMountTests(unittest.TestCase):
+    def test_registry_origin_is_signed_before_first_boot_without_changing_source(self):
+        target = 'ghcr.io/example/gniri:stable'
+        for prefix in ('ostree-unverified-registry:', 'ostree-unverified-image:docker://',
+                       'ostree-image-signed:docker://'):
+            self.assertEqual(finalize.signed_origin(prefix + target, target),
+                             'ostree-image-signed:docker://' + target)
+        for current in ('ostree-unverified-registry:localhost/gniri:development',
+                        'ostree-unverified-registry:ghcr.io/other/system:stable'):
+            with self.assertRaises(ValueError):
+                finalize.signed_origin(current, target)
+        with self.assertRaises(ValueError):
+            finalize.signed_origin('anything', 'localhost/gniri:development')
+
     def test_readback_preserves_repeated_console_and_storage_arguments(self):
         before = ['root=UUID=root', 'rw', 'rootflags=subvol=root', 'console=tty0',
                   'console=ttyS0,115200', 'rd.luks.uuid=luks-test', 'ostree=/ostree/boot.0/test']

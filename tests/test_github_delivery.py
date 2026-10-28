@@ -235,10 +235,10 @@ elif sys.argv[2] == 'upload':
 
 
 class DeliveryWorkflowTests(unittest.TestCase):
-    def test_single_workflow_has_only_the_ghcr_image_job(self):
+    def test_candidate_build_is_separate_from_protected_promotion(self):
         workflows = ROOT / '.github/workflows'
         self.assertEqual(sorted(p.name for p in workflows.iterdir() if p.suffix in {'.yml', '.yaml'}),
-                         ['build.yml'])
+                         ['build.yml', 'promote.yml'])
         workflow = (workflows / 'build.yml').read_text()
         jobs = workflow.split('\njobs:\n', 1)[1]
         self.assertEqual(re.findall(r'^  ([\w-]+):$', jobs, re.MULTILINE), ['build'])
@@ -250,6 +250,14 @@ class DeliveryWorkflowTests(unittest.TestCase):
         self.assertIn('workflow_dispatch:', workflow)
         self.assertIn('packages: write', jobs)
         self.assertIn('name: Publish signed image to GHCR', jobs)
+        promotion = (workflows / 'promote.yml').read_text()
+        self.assertIn('environment: stable', promotion)
+        self.assertIn('needs: validate', promotion)
+        self.assertIn("if: github.ref == 'refs/heads/main'", promotion)
+        self.assertIn('scripts/promote-image.py validate', promotion)
+        self.assertIn('scripts/promote-image.py promote', promotion)
+        self.assertNotIn('push:', promotion)
+        self.assertNotIn('schedule:', promotion)
 
     def test_regular_builds_publish_latest_after_signature_and_policy_checks(self):
         workflow = (ROOT / '.github/workflows/build.yml').read_text()

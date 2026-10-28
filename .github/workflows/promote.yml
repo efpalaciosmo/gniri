@@ -1,0 +1,101 @@
+name: Promote reviewed stable image
+
+on:
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: Reviewed sha256 candidate digest with committed release-evidence/DIGEST.json
+        required: true
+        type: string
+      run_id:
+        description: Successful main-branch candidate build run
+        required: true
+        type: string
+      run_attempt:
+        description: Exact candidate build attempt
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  packages: read
+
+concurrency:
+  group: gniri-stable-promotion
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    outputs:
+      baseline: ${{ steps.review.outputs.baseline }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install validators
+        run: bash scripts/install-ci-checks.sh
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.3
+      - name: Validate immutable candidate, evidence, channel and protections
+        id: review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REGISTRY_TOKEN: ${{ github.token }}
+          DIGEST: ${{ inputs.digest }}
+          RUN_ID: ${{ inputs.run_id }}
+          RUN_ATTEMPT: ${{ inputs.run_attempt }}
+        run: |
+          set -euo pipefail
+          [[ $DIGEST =~ ^sha256:[a-f0-9]{64}$ && $RUN_ID =~ ^[1-9][0-9]*$ && $RUN_ATTEMPT =~ ^[1-9][0-9]*$ ]]
+          printf '%s' "$REGISTRY_TOKEN" | skopeo login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          printf '%s' "$REGISTRY_TOKEN" | cosign login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          mkdir -p output/promotion
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT" > output/promotion/run.json
+          gh api "repos/$GITHUB_REPOSITORY/environments/stable" > output/promotion/environment.json
+          gh api "repos/$GITHUB_REPOSITORY/environments/stable/deployment-branch-policies" > output/promotion/branches.json
+          python3 scripts/promote-image.py validate --repository "$GITHUB_REPOSITORY" --digest "$DIGEST" \
+            --run output/promotion/run.json --environment output/promotion/environment.json \
+            --branches output/promotion/branches.json
+  promote:
+    needs: validate
+    runs-on: ubuntu-24.04
+    environment: stable
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+      deployments: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install validators
+        run: bash scripts/install-ci-checks.sh
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.3
+      - name: Promote the same reviewed digest without rebuilding
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REGISTRY_TOKEN: ${{ github.token }}
+          DIGEST: ${{ inputs.digest }}
+          RUN_ID: ${{ inputs.run_id }}
+          RUN_ATTEMPT: ${{ inputs.run_attempt }}
+          EXPECTED_STABLE: ${{ needs.validate.outputs.baseline }}
+          GNIRI_STABLE_REVIEWED: '1'
+        run: |
+          set -euo pipefail
+          [[ $DIGEST =~ ^sha256:[a-f0-9]{64}$ && $RUN_ID =~ ^[1-9][0-9]*$ && $RUN_ATTEMPT =~ ^[1-9][0-9]*$ ]]
+          printf '%s' "$REGISTRY_TOKEN" | skopeo login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          printf '%s' "$REGISTRY_TOKEN" | cosign login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          mkdir -p output/promotion
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT" > output/promotion/run.json
+          gh api "repos/$GITHUB_REPOSITORY/environments/stable" > output/promotion/environment.json
+          gh api "repos/$GITHUB_REPOSITORY/environments/stable/deployment-branch-policies" > output/promotion/branches.json
+          python3 scripts/promote-image.py promote --repository "$GITHUB_REPOSITORY" --digest "$DIGEST" \
+            --expected-stable "$EXPECTED_STABLE" --run output/promotion/run.json \
+            --environment output/promotion/environment.json --branches output/promotion/branches.json

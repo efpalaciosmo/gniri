@@ -14,20 +14,24 @@ RUN --mount=type=cache,target=/var/cache/gniri,sharing=locked \
 
 # Metadata must not invalidate the expensive package/download layers.
 ARG IMAGE_REF=localhost/gniri:development
+ARG FEDORA_VERSION
 ARG SOURCE_URL=""
 ARG SOURCE_REVISION="unknown"
 ARG BASE_IMAGE
 LABEL containers.bootc="1" \
+      org.opencontainers.image.version="${FEDORA_VERSION}" \
       org.opencontainers.image.title="Gniri" \
       org.opencontainers.image.description="Minimal GNOME and Niri on Fedora bootc" \
       org.opencontainers.image.source="${SOURCE_URL}" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
       org.opencontainers.image.base.name="${BASE_IMAGE}"
-COPY system_files/ /
+COPY system_files/ /run/gniri-build/system_files/
 COPY trust/ /run/gniri-build/trust/
 COPY packages/visible-applications.allow /run/gniri-build/packages/
-COPY build/configure-image.py build/signature-policy.py build/validate-image.sh build/validate-hardware.py build/finalize-image.py build/normalize-boot.py /run/gniri-build/
-RUN python3 /run/gniri-build/configure-image.py "${IMAGE_REF}" "${BASE_IMAGE}" "${SOURCE_REVISION}" \
+COPY build/configure-image.py build/configure-rpm-ostree.py build/signature-policy.py build/validate-image.sh build/validate-hardware.py build/validate-accounts.py build/finalize-image.py build/normalize-boot.py build/install-system-files.py /run/gniri-build/
+RUN python3 /run/gniri-build/install-system-files.py /run/gniri-build/system_files \
+    && python3 /run/gniri-build/configure-rpm-ostree.py \
+    && python3 /run/gniri-build/configure-image.py "${IMAGE_REF}" "${BASE_IMAGE}" "${SOURCE_REVISION}" "${FEDORA_VERSION}" \
     && bash /run/gniri-build/validate-image.sh \
     && python3 /run/gniri-build/normalize-boot.py \
     && python3 /run/gniri-build/finalize-image.py \

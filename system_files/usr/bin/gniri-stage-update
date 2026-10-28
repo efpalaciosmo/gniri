@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 
@@ -12,6 +13,7 @@ POLICY = '/usr/share/gniri/bootc-policy.json'
 STATE = Path('/var/lib/gniri/updates/status.json')
 PAUSE = Path('/etc/gniri/updates-paused')
 REFERENCE_FILE = Path('/usr/share/gniri/image-reference')
+BUILD_FILE = Path('/usr/share/gniri/build.json')
 
 
 class UpdateSkipped(Exception):
@@ -57,23 +59,43 @@ def save_state(path, outcome, message, now=None, staged_digest=None):
         Path(name).unlink(missing_ok=True)
 
 
-def stage_update(reference, status, environment=None):
+def update_reference(reference, status):
     if not reference.startswith('ghcr.io/'):
         raise UpdateSkipped('Local development image: registry updates are unavailable.')
     if status['spec'].get('bootOrder') == 'rollback' or status['status'].get('rollbackQueued'):
         raise UpdateSkipped('Rollback queued; update skipped.')
     booted = status['status']['booted']['image']['image']
     target = status['spec'].get('image')
-    if (booted['image'] != reference or not target or target['image'] != reference
-            or target['transport'] != 'registry'):
+    repository = reference.rsplit(':', 1)[0]
+    if (not target or booted['image'] != target['image']
+            or booted.get('transport') != 'registry' or target['transport'] != 'registry'
+            or target['image'] not in (repository + ':stable', repository + ':latest')):
         raise UpdateSkipped('Update source differs from this image. Review the source before updating.')
+    return target['image']
+
+
+def stage_update(reference, status, environment=None):
+    reference = update_reference(reference, status)
+    target = status['spec']['image']
     if target.get('signature') != 'containerPolicy':
-        # Anaconda's bootc command does not expose the policy flag. Enroll
-        # before the first automatic update; switch also stages the update.
+        # Compatibility with older installations. New installers enroll the
+        # signed origin offline; switch also stages a verified update here.
         subprocess.run(['bootc', 'switch', '--enforce-container-sigpolicy', reference],
                        check=True, env=environment)
     else:
         subprocess.run(['bootc', 'upgrade'], check=True, env=environment)
+
+
+def check_version(reference, current, environment):
+    # Fail closed for legacy/unlabelled targets. Publication also checks this
+    # against the stable channel before changing its tag.
+    metadata = json.loads(subprocess.check_output(
+        ['skopeo', 'inspect', f'docker://{reference}'], env=environment, text=True))
+    version = (metadata.get('Labels') or {}).get('org.opencontainers.image.version', '')
+    if not isinstance(version, str) or not re.fullmatch(r'[1-9][0-9]*', version):
+        raise ValueError('Update image lacks its Fedora version label; publish a validated candidate first.')
+    if int(version) < int(current):
+        raise ValueError(f'Refusing Fedora downgrade: {current} -> {version}')
 
 
 def main():
@@ -92,8 +114,11 @@ def main():
             raise UpdateSkipped('Updates paused by /etc/gniri/updates-paused.')
         if not reference.startswith('ghcr.io/'):
             raise UpdateSkipped('Local development image: registry updates are unavailable.')
-        environment = policy_environment(reference)
         status = json.loads(subprocess.check_output(['bootc', 'status', '--json']))
+        reference = update_reference(reference, status)
+        environment = policy_environment(reference)
+        current = json.loads(BUILD_FILE.read_text())['fedora_version']
+        check_version(reference, current, environment)
         stage_update(reference, status, environment)
         status = json.loads(subprocess.check_output(['bootc', 'status', '--json']))
         staged = status['status'].get('staged')

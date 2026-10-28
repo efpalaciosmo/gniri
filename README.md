@@ -23,6 +23,9 @@ hasta 30 minutos de retraso aleatorio y recuperación si el equipo estaba apagad
 **Nunca se reinicia automáticamente.**
 
 Cada construcción resuelve el canal oficial `fedora-bootc:latest` a un digest.
+La referencia completa es `quay.io/fedora/fedora-bootc:latest`: es una base
+arrancable, a diferencia del contenedor de aplicaciones `fedora:latest`.
+El digest fija **ese build**, no el número de versión para los builds siguientes.
 No necesitas cambiar números de Fedora: Gniri sigue las versiones estables,
 no Rawhide. Los equipos siguen `gniri:stable`; los candidatos solo se promueven
 después de revisar pruebas de esa imagen. Esto no convierte Fedora en una
@@ -32,7 +35,8 @@ distribución rolling ni garantiza transiciones de versión sin mantenimiento.
 make check
 make build
 make build REFRESH=1  # Renueva también los RPM aunque la base no haya cambiado.
-make iso    # Local: no requiere cuenta GitHub ni publicar la imagen.
+make iso    # Instalador del stable publicado y verificado; origen GHCR permanente.
+# Para desarrollo sin actualizaciones de registro: make iso-local
 ```
 
 `make build` solo crea la imagen de Podman. `make iso` genera
@@ -55,16 +59,20 @@ Para descargas sin credenciales, la [configuración inicial](docs/building.md#gi
 explica cómo hacer público el paquete.
 
 `latest` es el candidato más reciente; las instalaciones siguen el canal revisado
-`stable`. El único workflow, [`build.yml`](.github/workflows/build.yml), tiene un
-solo job: construir, validar, firmar y publicar la imagen en GHCR. Las ISOs se
-generan localmente con `make iso` o `make iso-published`.
+`stable`. [`build.yml`](.github/workflows/build.yml) construye y firma candidatos.
+[`promote.yml`](.github/workflows/promote.yml) promueve un digest ya probado,
+sin reconstruirlo, tras validar evidencia y obtener revisión en el entorno
+protegido `stable`. No permite bajar de versión mayor de Fedora.
+Las ISOs se generan localmente; `make iso-candidate PAYLOAD_REF=...` permite
+probar el candidato siguiendo `latest` sin cambiar el canal de producción.
 La [guía de construcción](docs/building.md#github-configuración-inicial) describe
 secretos, etiquetas e inventarios de la imagen.
 
 > **En desarrollo:** no instalar en el equipo principal hasta probar la ISO,
 > Secure Boot, actualizaciones y rollback en una VM.
-> `make iso` es para desarrollo y no proporciona actualizaciones de registro.
-> Para el equipo principal, usar una imagen publicada, firmada y validada.
+> `make iso-local` es para desarrollo y no proporciona actualizaciones de registro.
+> `make iso` exige un `stable` publicado con metadatos válidos. Una etiqueta o
+> una firma no sustituye la validación de instalación, GDM y actualización/rollback.
 
 - [Construcción, ISO, firmas y publicación](docs/building.md)
 - [Uso, dotfiles, hardware y recuperación](docs/usage.md)
