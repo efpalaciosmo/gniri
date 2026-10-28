@@ -15,9 +15,9 @@ class DesktopTests(unittest.TestCase):
         self.assertLess(len(NIRI.read_text().splitlines()), 100)
         self.assertNotIn('include ', NIRI.read_text())
 
-    def test_kitty_launcher_and_basic_bindings(self):
+    def test_ghostty_launcher_and_basic_bindings(self):
         text = NIRI.read_text()
-        for key, action in (('Mod+Return', 'spawn "kitty"'), ('Mod+D', 'spawn "fuzzel"'),
+        for key, action in (('Mod+Return', 'spawn "ghostty"'), ('Mod+D', 'spawn "fuzzel"'),
                             ('Mod+Q', 'close-window'), ('Mod+Shift+E', 'quit')):
             self.assertRegex(text, re.escape(key) + r'[^\n]+\{ ' + re.escape(action))
 
@@ -37,7 +37,7 @@ class DesktopTests(unittest.TestCase):
         self.assertIn('spawn-at-startup "waybar"', text)
         self.assertIn('spawn-at-startup "mako"', text)
         self.assertIn('spawn-at-startup "/usr/bin/lxpolkit"', text)
-        for app in ('waybar', 'mako', 'kitty', 'fuzzel', 'swaylock', 'zathura'):
+        for app in ('waybar', 'mako', 'ghostty', 'fuzzel', 'swaylock', 'zathura'):
             self.assertFalse((OVERLAY / 'etc/xdg' / app).exists())
 
     def test_screen_lock_is_not_removed_with_the_dotfiles(self):
@@ -97,7 +97,7 @@ class DesktopTests(unittest.TestCase):
         for library in ('libEGL.so.1', 'libGLESv2.so.2', 'libGL.so.1', 'libgbm.so.1'):
             self.assertIn(library, validation)
         self.assertIn('ctypes.CDLL(library)', validation)
-        self.assertIn('import kitty.fast_data_types', validation)
+        self.assertIn('ghostty +validate-config', validation)
 
     @unittest.skipUnless(shutil.which('niri'), 'Validated again inside the image build')
     def test_config_parses_with_niri(self):

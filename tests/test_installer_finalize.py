@@ -73,7 +73,7 @@ class RootMountTests(unittest.TestCase):
             self.assertEqual(path.with_name('fstab.gniri-before-rootflags').read_text(), original)
 
     def test_installer_runs_finalizer_after_configuration_without_hiding_failure(self):
-        recipe = (ROOT / 'installer/prepare.sh').read_text()
+        recipe = ((ROOT / 'installer/prepare.sh').read_text() + (ROOT / 'installer/configure-payload.sh').read_text())
         self.assertIn('%post --nochroot --erroronfail\n', recipe)
         self.assertIn('/usr/bin/python3 /usr/libexec/gniri-installer-finalize.py', recipe)
         self.assertNotIn('systemctl mask systemd-remount-fs', recipe)

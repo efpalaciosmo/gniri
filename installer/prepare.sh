@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 # Adapted from osbuild/image-builder's documented bootc-generic-iso contract.
 set -euo pipefail
-payload=${1:?Payload image required}
-target=${2:?Target image reference required}
-# shellcheck source=scripts/iso-common.sh
-source /run/gniri-iso-common.sh
-gniri_validate_iso_refs "$payload" "$target"
 # osbuild runs tmpfiles with the build root's /usr mounted read-only. The base
 # has a rule for this absent directory; create it before freezing the image.
 install -d -m 0755 /usr/local/sbin
@@ -31,17 +26,6 @@ grub2:
     - name: Install Gniri
       linux: /images/pxeboot/vmlinuz inst.stage2=hd:LABEL=Gniri-Installer console=tty0 inst.graphical selinux=1 enforcing=0 rhgb quiet
       initrd: /images/pxeboot/initrd.img
-EOF
-# No clearpart, autopart, user password, reboot or non-interactive directives.
-# Published payloads are pinned by digest and update from :stable. Local
-# development payloads do not fetch updates. Both install from immutable OCI
-# blobs embedded in squashfs, without rebuilding multi-GB layers in live RAM.
-cat > /usr/share/anaconda/interactive-defaults.ks <<EOF
-bootc --source-imgref oci:/usr/share/gniri/installer-payload --target-imgref ${target}
-selinux --enforcing
-%post --nochroot --erroronfail
-/usr/bin/python3 /usr/libexec/gniri-installer-finalize.py
-%end
 EOF
 printf 'install:x:0:0:root:/root:/usr/libexec/anaconda/run-anaconda\n' >> /etc/passwd
 printf 'install::14438:0:99999:7:::\n' >> /etc/shadow

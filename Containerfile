@@ -26,8 +26,9 @@ LABEL containers.bootc="1" \
 COPY system_files/ /
 COPY trust/ /run/gniri-build/trust/
 COPY packages/visible-applications.allow /run/gniri-build/packages/
-COPY build/configure-image.py build/signature-policy.py build/validate-image.sh build/validate-hardware.py build/finalize-image.py /run/gniri-build/
+COPY build/configure-image.py build/signature-policy.py build/validate-image.sh build/validate-hardware.py build/finalize-image.py build/normalize-boot.py /run/gniri-build/
 RUN python3 /run/gniri-build/configure-image.py "${IMAGE_REF}" "${BASE_IMAGE}" "${SOURCE_REVISION}" \
     && bash /run/gniri-build/validate-image.sh \
+    && python3 /run/gniri-build/normalize-boot.py \
     && python3 /run/gniri-build/finalize-image.py \
     && bootc container lint --fatal-warnings

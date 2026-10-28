@@ -22,9 +22,11 @@ fetch "JetBrainsMono-${NERD_FONTS_VERSION}.tar.xz" \
 mkdir "$work/fonts"
 tar -xJf "$cache/JetBrainsMono-${NERD_FONTS_VERSION}.tar.xz" -C "$work/fonts"
 install -d /usr/share/fonts/jetbrains-mono-nerd /usr/share/licenses/gniri-nerd-fonts
-# Keep every weight of the family actually used by the defaults, without
-# duplicating the NL, Propo and Nerd Font Mono variants from the full archive.
-find "$work/fonts" -name 'JetBrainsMonoNerdFont-*.ttf' -exec install -m 0644 -t /usr/share/fonts/jetbrains-mono-nerd/ {} +
+# Keep the four terminal styles instead of every weight and duplicate family.
+for style in Regular Bold Italic BoldItalic; do
+    install -m 0644 "$work/fonts/JetBrainsMonoNerdFont-${style}.ttf" \
+        /usr/share/fonts/jetbrains-mono-nerd/
+done
 install -m 0644 "$work/fonts/OFL.txt" /usr/share/licenses/gniri-nerd-fonts/
 
 # Pinned upstream tools; review RPM availability when the stable base changes.

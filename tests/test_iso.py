@@ -83,7 +83,7 @@ class IsoReferencesTests(unittest.TestCase):
         script = (ROOT / 'scripts/build-iso.sh').read_text()
         self.assertIn('--bootc-default-fs ext4', script)
         self.assertIn('bootc-generic-iso', script)
-        installer = (ROOT / 'installer/prepare.sh').read_text()
+        installer = ((ROOT / 'installer/prepare.sh').read_text() + (ROOT / 'installer/configure-payload.sh').read_text())
         active = '\n'.join(line for line in installer.splitlines()
                            if not line.lstrip().startswith('#'))
         for directive in ('autopart', '--fstype', 'rootflags=', '--bootc-default-fs'):
@@ -92,7 +92,7 @@ class IsoReferencesTests(unittest.TestCase):
 
     def test_payload_is_streamed_from_an_oci_directory_not_live_ram(self):
         script = (ROOT / 'scripts/build-iso.sh').read_text()
-        installer = (ROOT / 'installer/prepare.sh').read_text()
+        installer = ((ROOT / 'installer/prepare.sh').read_text() + (ROOT / 'installer/configure-payload.sh').read_text())
         containerfile = (ROOT / 'installer/Containerfile').read_text()
         self.assertIn('podman save --format oci-dir --output "$payload_dir" "$payload"', script)
         self.assertIn('mktemp -d "$PWD/output/installer-payload.XXXXXX"', script)
@@ -107,7 +107,7 @@ class IsoReferencesTests(unittest.TestCase):
         self.assertNotIn('remount,size=', script + installer)
 
     def test_selinux_permissive_mode_is_scoped_to_the_installer(self):
-        installer = (ROOT / 'installer/prepare.sh').read_text()
+        installer = ((ROOT / 'installer/prepare.sh').read_text() + (ROOT / 'installer/configure-payload.sh').read_text())
         self.assertIn('inst.graphical selinux=1 enforcing=0', installer)
         self.assertIn("grep -qx 'SELINUX=permissive' /etc/selinux/config", installer)
         self.assertIn('\nselinux --enforcing\n', installer)

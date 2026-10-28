@@ -57,7 +57,7 @@ rpm -q "f${VERSION_ID}-backgrounds-base" "f${VERSION_ID}-backgrounds-gnome" gnom
 [[ -s /usr/share/gnome-background-properties/f${VERSION_ID}.xml ]]
 [[ -s /usr/share/backgrounds/f${VERSION_ID}/default/f${VERSION_ID}-01-day.jxl ]]
 [[ -s /usr/share/backgrounds/f${VERSION_ID}/default/f${VERSION_ID}-01-night.jxl ]]
-# Niri/Kitty load EGL/GLES/GL at runtime: ldd on the main executable alone
+# Niri/Ghostty load EGL/GLES/GL at runtime: ldd on the main executable alone
 # cannot prove these libraries are usable. Do not silently accept missing dlopen
 # dependencies when installing without weak RPM dependencies.
 python3 - <<'PY'
@@ -65,13 +65,14 @@ import ctypes
 for library in ('libEGL.so.1', 'libGLESv2.so.2', 'libGL.so.1', 'libgbm.so.1'):
     ctypes.CDLL(library)
 PY
-kitty +runpy 'import kitty.fast_data_types; print("Kitty native module loaded")'
+ghostty +version
+ghostty +validate-config --config-file=/dev/null
 [[ -f /usr/share/libvirt/networks/default.xml || -f /etc/libvirt/qemu/networks/default.xml ]]
 fc-match 'JetBrainsMono Nerd Font' --format '%{family}\n' | grep -F 'JetBrainsMono Nerd Font'
 [[ -s /usr/share/licenses/gniri-nerd-fonts/OFL.txt ]]
 niri validate --config /etc/niri/config.kdl
 [[ ! -e /usr/share/gniri/defaults && ! -e /usr/bin/gniri-user-setup ]]
-for command in distrobox fastfetch vi vim traceroute kitty niri-session dbus-update-activation-environment fuzzel mako waybar swayidle swaylock nautilus wpctl playerctl; do
+for command in distrobox fastfetch vi vim traceroute ghostty niri-session dbus-update-activation-environment fuzzel mako waybar swayidle swaylock nautilus wpctl playerctl; do
     command -v "$command"
 done
 for module in uinput wacom kvm_amd amdgpu; do

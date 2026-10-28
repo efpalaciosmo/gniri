@@ -27,7 +27,7 @@ spawn-at-startup "swayidle" "-w" \
 screenshot-path "~/Screenshot-%Y-%m-%d-%H-%M-%S.png"
 
 binds {
-    Mod+Return repeat=false hotkey-overlay-title="Open terminal" { spawn "kitty"; }
+    Mod+Return repeat=false hotkey-overlay-title="Open terminal" { spawn "ghostty" "--working-directory=home"; }
     Mod+D repeat=false hotkey-overlay-title="Open launcher" { spawn "fuzzel"; }
     Mod+E repeat=false hotkey-overlay-title="Open files" { spawn "nautilus"; }
     Mod+Alt+L repeat=false hotkey-overlay-title="Lock screen" { spawn "swaylock" "-f"; }

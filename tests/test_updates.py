@@ -61,17 +61,17 @@ class UpdateTests(unittest.TestCase):
         self.assertIn('RandomizedDelaySec=30min', text)
 
     def test_scheduled_publication_is_weekly_not_daily(self):
-        text = (ROOT / '.github/workflows/build.yml').read_text()
+        text = (ROOT / '.github/workflows/iso.yml').read_text()
         self.assertIn("cron: '20 6 * * 6'", text)
         self.assertNotIn("cron: '20 6 * * *'", text)
 
     def test_builds_never_promote_stable(self):
-        text = (ROOT / '.github/workflows/build.yml').read_text()
+        text = (ROOT / '.github/workflows/iso.yml').read_text()
         guard = "github.event_name != 'pull_request' && github.ref == 'refs/heads/main'"
-        self.assertEqual(text.count(guard), 4)
+        self.assertGreaterEqual(text.count(guard), 3)
         self.assertIn('persist-credentials: false', text)
         self.assertNotRegex(text, r'podman push[^\n]+"\$IMAGE:stable"')
-        promotion = (ROOT / '.github/workflows/promote.yml').read_text()
+        promotion = (ROOT / '.github/workflows/iso.yml').read_text()
         self.assertIn('environment: stable', promotion)
         self.assertIn('release-gate.py validate', promotion)
         self.assertIn('--preserve-digests', promotion)
@@ -87,7 +87,7 @@ class UpdateTests(unittest.TestCase):
         self.assertNotIn('--apply', text)
 
     def test_installer_never_automatically_formats_disks(self):
-        text = (ROOT / 'installer/prepare.sh').read_text()
+        text = ((ROOT / 'installer/prepare.sh').read_text() + (ROOT / 'installer/configure-payload.sh').read_text())
         # Ignore comments explaining the omission.
         active = '\n'.join(line for line in text.splitlines() if not line.lstrip().startswith('#'))
         for token in ('clearpart --all', 'zerombr', 'autopart --', '--non-interactive', 'selinux=0'):

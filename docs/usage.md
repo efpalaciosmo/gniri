@@ -5,7 +5,7 @@
 GDM ofrece GNOME y Niri y recuerda la selección de cada usuario. Niri usa
 [`/etc/niri/config.kdl`](../system_files/etc/niri/config.kdl) solo si no existe
 `$XDG_CONFIG_HOME/niri/config.kdl` o `~/.config/niri/config.kdl`. El respaldo está
-en inglés: `Super+Enter` abre Kitty; `Super+D`, Fuzzel; `Super+Alt+L`, swaylock.
+en inglés: `Super+Enter` abre Ghostty; `Super+D`, Fuzzel; `Super+Alt+L`, swaylock.
 Incluye Waybar/Mako, agente polkit y bloqueo a los cinco minutos/antes de suspender.
 
 No se copian dotfiles, temas ni scripts personales al entrar; tampoco se cambia
@@ -172,3 +172,12 @@ sudo umount /mnt/gniri-var
 
 Verifica usuario, propietario, montaje y escritura antes de volver a GDM. Si no
 coinciden esas condiciones, detente: no improvises con `rm`, `usermod` ni permisos 777.
+
+
+Ghostty es el terminal predeterminado. `Super+Enter` abre una ventana en el home;
+los ajustes personales de Ghostty y del shell siguen en tus dotfiles. En bootc,
+`/home` enlaza a `/var/home`: ambas rutas son normales. El perfil del sistema
+normaliza el directorio lógico al iniciar un shell interactivo que ya esté en
+el home para que el prompt pueda mostrar `~`; no cambia directorios de proyectos.
+Si el prompt personal conserva colores o saltos extraños, revisa que sus códigos
+ANSI estén delimitados con `\[` y `\]` en Bash (o `%{` y `%}` en Zsh).

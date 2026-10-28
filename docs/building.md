@@ -17,7 +17,8 @@ solo todo el filesystem. La compatibilidad Secure Boot necesita pruebas reales.
 Los [manifiestos RPM](../packages/) omiten grupos de escritorio y dependencias
 débiles. Los fondos se eligen desde `VERSION_ID`; los lanzadores se validan contra
 [su lista](../packages/visible-applications.allow). Tailscale usa su repositorio
-oficial; [las descargas upstream](../build/upstream.env) tienen versión/checksum
+oficial; Ghostty usa el COPR `scottames/ghostty`, limitado a ese paquete y con
+verificación de firmas RPM. [Las descargas upstream](../build/upstream.env) tienen versión/checksum
 fijos. Los RPM siguen repositorios vivos: no hay reproducibilidad bit a bit.
 
 ## Construcción local
@@ -35,9 +36,10 @@ make iso                # Construye la imagen y genera la ISO local; pide sudo.
 | Opción | Uso |
 | --- | --- |
 | `REFRESH=1` | Reejecuta transacciones RPM sin borrar cachés de descarga; usar para releases. |
-| `RECHUNK=0` | Omite el repacking solo para diagnóstico. |
+| `RECHUNK=1` | Activa el repacking validado; CI lo conserva para candidatos firmados. |
 | `BUILD_NETWORK=host` | Diagnóstico de DNS en contenedores; reduce aislamiento, no cambia el firewall. |
 
+Los builds locales omiten el repacking por defecto para acelerar iteraciones.
 Chunkah se fija por digest y corre sin red. Antes de sustituir la etiqueta se
 comprueban lint bootc, configuración OCI, contenido, permisos, propietarios,
 enlaces y xattrs. Se admiten el modo raíz 0555 y deduplicación inmutable de `/usr`,
@@ -151,31 +153,23 @@ pruebas reales → PR de evidencia → aprobación del entorno stable
               → promover el mismo digest a stable → publicar GitHub Release
 ```
 
-1. **Build and publish Gniri**, desde `main`, construye fresco, valida, repackea y
-   publica el candidato firmado `sha-COMMIT-RUN_ID-ATTEMPT`; **no escribe `:stable`**.
-   Se ejecuta por cambios de código, manualmente y los sábados a las 06:20 UTC.
-   Las pull requests no publican. CI comprueba el cliente real contra imágenes
-   firmadas, sin firma y con clave incorrecta; `policy-test-*` no son versiones instalables.
-2. Tras un build publicable correcto, el mismo run llama **Build installer ISO**
-   con **ese digest exacto**, sin resolver una etiqueta mutable. Usa otro runner
-   para no conservar simultáneamente el almacenamiento de ambas construcciones.
-   Incluye verificaciones Cosign y regresiones reales de montajes/finalización.
-3. En la página del run descarga `gniri-installer-x86_64-ATTEMPT`: contiene ISO,
-   `SHA256SUMS`, `build.json` y `validation.json`. Este último registra digest,
-   revisión, checksum y `candidate_run_id`/`candidate_run_attempt`; todos los
-   resultados de pruebas siguen siendo `untested`. También están disponibles
-   `gniri-candidate-inventory-ATTEMPT` y `gniri-iso-logs-ATTEMPT`.
-   Cada reejecución usa nombres distintos; no mezcles artefactos de intentos diferentes.
-4. **Build installer ISO** sigue disponible manualmente desde `main` para generar
-   una ISO de otro candidato: `payload_digest` es obligatorio y debe ser el digest
-   exacto de un candidato firmado creado por **Build and publish Gniri**. No hay
-   fallback a `stable`: puede seguir apuntando a una imagen antigua sin los metadatos
-   de base resuelta que necesita el instalador. Si falta esa base, construye un
-   candidato nuevo; reejecutar la ISO con el digest antiguo no lo modifica. No se
-   debe promover a `stable` para poder construir la ISO de un candidato.
-   También registra su propio run/intento y puede proporcionar una ISO
-   revisada para promoción. La alternativa local, no apta para esta promoción
-   basada en artefactos Actions, es:
+1. **Build installer ISO** es el único workflow. Desde `main`, construye la imagen,
+   valida Ghostty/Niri, repackea y firma el candidato `sha-COMMIT-RUN_ID-ATTEMPT`;
+   **no escribe `:stable`**. Se ejecuta por cambios de código, manualmente sin
+   rellenar `evidence` y los sábados a las 06:20 UTC. Las PR solo construyen y
+   validan la imagen, sin secretos ni publicación. Los checks de fuentes corren
+   una vez; no hay un workflow de checks duplicado.
+2. El job ISO usa **el digest exacto** del job de imagen, en otro runner para
+   limitar espacio máximo. Verifica Cosign y ejecuta las regresiones de montajes
+   y finalización. No requiere copiar un digest manualmente. La preparación RPM
+   del instalador y su initramfs se pueden reutilizar al cambiar solo el payload.
+3. Descarga `gniri-installer-x86_64-ATTEMPT` del run: contiene ISO, `SHA256SUMS`,
+   `build.json` y `validation.json` con resultados `untested`. También se conservan
+   inventarios y logs. No mezcles artefactos de intentos diferentes.
+4. Para promover una ISO ya revisada, ejecuta **Build installer ISO** desde `main`
+   con `evidence=release-evidence/NOMBRE.json`. Ese modo omite los builds y usa el
+   job protegido por el entorno `stable`; verifica la ISO exacta antes de promover.
+   Para generar localmente una ISO de un candidato firmado existente:
 
    ```sh
    make iso-published REFRESH=1 \
@@ -197,7 +191,7 @@ pruebas reales → PR de evidencia → aprobación del entorno stable
    credenciales, datos personales ni discos VM. Los artefactos Actions caducan a los
    30 días (o antes si la política del repositorio impone menos); promueve antes de
    que caduquen. Si reconstruyes o reejecutas, vuelve a comprobar la nueva ISO y evidencia.
-7. Ejecuta **Promote tested candidate to stable** desde `main`, indicando esa ruta.
+7. Ejecuta **Build installer ISO** (con `evidence`) desde `main`, indicando esa ruta.
    Tras el gate y aprobación, descarga el artefacto del run/intento revisados. Exige
    un run correcto de `main` en este repositorio y comprueba SHA-256 real de ISO,
    metadatos, revisión de instalador y payload frente a la evidencia. No reconstruye.

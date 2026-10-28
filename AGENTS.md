@@ -10,9 +10,9 @@ Run commands from the repository root. Image builds require Linux x86_64, Podman
 
 - `make check`: run source checks and Python unit tests.
 - `make build`: run checks, build `localhost/gniri:development`, and repack OCI layers; produces an image only.
-- `make check-desktop`: after building, verify Kitty maps a window in nested Niri inside a disposable headless container.
+- `make check-desktop`: after building, verify Ghostty maps a window in nested Niri inside a disposable headless container.
 - `make iso`: build the local image and generate `output/iso/gniri-x86_64.iso`; requests sudo for privileged build operations.
-- `make build RECHUNK=0`: skip layer repacking for diagnosis.
+- `make build RECHUNK=1`: enable validated layer repacking (local builds skip it by default).
 - `make build REFRESH=1`: rerun package transactions while preserving download caches.
 - `sudo make check-installer`: run real mount/finalizer regressions in the built rootful installer.
 

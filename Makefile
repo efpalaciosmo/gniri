@@ -1,14 +1,15 @@
 IMAGE ?= localhost/gniri:development
 SOURCE_URL ?=
 BUILD_NETWORK ?=
-RECHUNK ?= 1
+RECHUNK ?= 0
 REFRESH ?= 0
+CHECKED ?= 0
 SOURCE_REVISION ?= $(shell git describe --always --dirty --abbrev=40)
 
 .PHONY: help check check-desktop check-installer build iso iso-local iso-published
 help:
 	@echo 'make check  - static checks and unit tests'
-	@echo 'make check-desktop - test Kitty windows and nested Niri in a disposable headless container'
+	@echo 'make check-desktop - test Ghostty windows and nested Niri in a disposable headless container'
 	@echo 'sudo make check-installer - test real Anaconda/OSTree tasks in a built rootful installer'
 	@echo 'make build  - build the Podman image only (does not create an ISO)'
 	@echo 'make build REFRESH=1 - resolve latest stable Fedora and rerun RPM transactions'
@@ -20,7 +21,7 @@ check:
 	python3 scripts/check.py
 	python3 -m unittest discover -s tests -v
 
-check-desktop: check
+check-desktop: $(if $(filter 1,$(CHECKED)),,check)
 	podman build $(if $(strip $(BUILD_NETWORK)),--network="$(BUILD_NETWORK)") --build-arg "IMAGE=$(IMAGE)" -f tests/desktop.Containerfile -t localhost/gniri-desktop-test:validation .
 	podman run --rm --network=none localhost/gniri-desktop-test:validation
 

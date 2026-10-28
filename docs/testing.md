@@ -20,7 +20,7 @@ sudo make check-installer  # Tras generar el instalador rootful con make iso.
 `make check` comprueba sintaxis y ejecuta unittest; usa Niri/ShellCheck/actionlint
 si están instalados. CI instala y exige los dos linters. `check-desktop` usa
 Weston/software rendering en un contenedor desechable sin GPU/display del host;
-confirma una ventana Kitty en Niri, no GDM, logind, SELinux ni DRM físico.
+confirma una ventana Ghostty en Niri, no GDM, logind, SELinux ni DRM físico.
 
 `check-installer` ejecuta tareas reales Anaconda/OSTree sobre tmpfs: layouts de
 home/var/EFI y `/boot`, readback de argumentos, preservación de `fstab` tras fallo
@@ -107,7 +107,7 @@ Esta lista es un inventario, no resultados ya obtenidos:
   Instalador SELinux permisivo, destino Enforcing. Initramfs con `.buildstamp`,
   EDD solo BIOS e `IsFinal` acorde con la base; Anaconda conserva `/boot` escribible
   hasta completar configuración mediante `--skip-finalize`.
-- [ ] **Ambos escritorios:** login GDM y selección recordada, Kitty, fondos Fedora,
+- [ ] **Ambos escritorios:** login GDM y selección recordada, Ghostty, fondos Fedora,
   portales Flatpak (archivos/pantalla/clipboard), polkit, keyring, red, audio y
   Bluetooth. Login offline, Flathub solo de usuario, sin apps preinstaladas;
   prioridad de dotfiles/Stow y preservación tras actualización.

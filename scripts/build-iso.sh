@@ -39,7 +39,7 @@ base=$(podman image inspect --format '{{ index .Config.Labels "org.opencontainer
     if [[ $payload == localhost/gniri:development ]]; then
         printf 'Rebuild it with make build.\n' >&2
     else
-        printf 'Run Build and publish Gniri, then use its signed candidate digest as payload_digest for Build installer ISO. Re-running an old digest or selecting stable cannot add missing metadata.\n' >&2
+        printf 'Run Build installer ISO to create a new signed candidate and its ISO, or pass that signed candidate digest to make iso-published. Re-running an old digest or selecting stable cannot add missing metadata.\n' >&2
     fi
     exit 1
 }

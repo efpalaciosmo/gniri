@@ -1,6 +1,6 @@
 brightnessctl
 fuzzel
-kitty
+ghostty
 libnotify
 lxpolkit
 mako
