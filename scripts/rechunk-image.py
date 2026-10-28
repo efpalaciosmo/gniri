@@ -59,6 +59,7 @@ def rechunk(source, destination, work):
               'layers': len(manifest['layers']), 'chunkah': CHUNKAH_IMAGE}
     (work / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
+    return report
 
 
 def main():
@@ -66,16 +67,20 @@ def main():
     parser.add_argument('source')
     parser.add_argument('--tag', help='Destination tag; defaults to replacing the source tag')
     parser.add_argument('--output', type=Path, help='Keep OCI output and report in a new directory')
+    parser.add_argument('--report', type=Path, help='Save size metrics without retaining OCI blobs')
     args = parser.parse_args()
     cache = ROOT / '.cache'
     cache.mkdir(exist_ok=True)
     if args.output:
         work = args.output.resolve()
         work.mkdir(parents=True, exist_ok=False)
-        rechunk(args.source, args.tag or args.source, work)
+        report = rechunk(args.source, args.tag or args.source, work)
     else:
         with tempfile.TemporaryDirectory(prefix='rechunk-', dir=cache) as temporary:
-            rechunk(args.source, args.tag or args.source, Path(temporary))
+            report = rechunk(args.source, args.tag or args.source, Path(temporary))
+    if args.report:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(json.dumps(report, indent=2) + '\n')
 
 
 if __name__ == '__main__':

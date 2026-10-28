@@ -1,4 +1,4 @@
-name: Build installer ISO
+name: Build and publish image
 
 on:
   pull_request:
@@ -6,9 +6,15 @@ on:
     branches: [main]
     paths-ignore: ['**.md', 'docs/**', 'release-evidence/**']
   schedule:
-    - cron: '20 6 * * 6'
+    # Saturday 05:00 America/Bogota (UTC-5).
+    - cron: '0 10 * * 6'
   workflow_dispatch:
     inputs:
+      build_iso:
+        description: 'Also build an installer ISO for release validation'
+        required: false
+        default: false
+        type: boolean
       evidence:
         description: 'Optional: committed release-evidence/name.json to promote a tested ISO instead of building'
         required: false
@@ -19,7 +25,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: iso-${{ github.ref }}-${{ inputs.evidence != '' && 'promotion' || 'build' }}
+  group: image-${{ github.ref }}-${{ inputs.evidence != '' && 'promotion' || 'build' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -64,8 +70,10 @@ jobs:
             reference="$IMAGE:stable"
           fi
           sudo python3 scripts/build-image.py localhost/gniri:build --reference "$reference" \
-            --source "$SOURCE" --revision "$GITHUB_SHA"
-          sudo python3 scripts/rechunk-image.py localhost/gniri:build
+            --source "$SOURCE" --revision "$GITHUB_SHA" --fresh
+          sudo python3 scripts/rechunk-image.py localhost/gniri:build \
+            --report output/inventory/image-size.json
+          sudo chown -R "$(id -u):$(id -g)" output/inventory
       - name: Desktop and offline Flatpak regressions
         run: |
           sudo make check-desktop CHECKED=1 IMAGE=localhost/gniri:build
@@ -118,9 +126,22 @@ jobs:
             --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" \
             --output output/inventory/validation.json
           cp output/digest output/inventory/
+          # Update the convenient pull tag only after signing and all regressions.
+          # Copy the manifest unchanged so the signature remains bound to its digest.
+          sudo skopeo copy --all --preserve-digests "docker://$IMAGE@$digest" "docker://$IMAGE:latest"
+          actual=$(sudo skopeo inspect --format '{{.Digest}}' "docker://$IMAGE:latest")
+          test "$actual" = "$digest"
+          cosign verify --new-bundle-format=false --key trust/cosign.pub "$IMAGE@$actual"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          printf '### Signed candidate\n\n%s@%s\n\nThe ISO job uses this exact digest; stable is unchanged.\n' \
-            "$IMAGE" "$digest" >> "$GITHUB_STEP_SUMMARY"
+          printf '### Signed image\n\n    docker pull %s:latest\n\nDigest: %s@%s\n\nSaturday 05:00 America/Bogota. The stable release channel requires reviewed evidence.\n' \
+            "$IMAGE" "$IMAGE" "$digest" >> "$GITHUB_STEP_SUMMARY"
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          report = json.loads(Path('output/inventory/image-size.json').read_text())
+          print(f"\nCompressed layers: {report['result_layer_bytes_gzip'] / 1024**3:.2f} GiB")
+          print(f"\nUncompressed image: {report['result_size_bytes_podman'] / 1024**3:.2f} GiB")
+          PY
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -130,7 +151,7 @@ jobs:
 
   iso:
     needs: build
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.build.outputs.digest != ''
+    if: github.event_name == 'workflow_dispatch' && inputs.build_iso && github.ref == 'refs/heads/main' && needs.build.outputs.digest != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     permissions:

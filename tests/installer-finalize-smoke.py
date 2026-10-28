@@ -24,11 +24,11 @@ def check_layout(separate_boot):
         base = Path(temporary)
         physical, tree = base / 'target', base / 'tree'
         physical.mkdir()
-        run('mount', '-t', 'tmpfs', 'tmpfs', physical)
+        run('mount', '-t', 'tmpfs', 'gniri-finalize-root', physical)
         try:
             (physical / 'boot').mkdir()
             if separate_boot:
-                run('mount', '-t', 'tmpfs', 'tmpfs', physical / 'boot')
+                run('mount', '-t', 'tmpfs', 'gniri-finalize-boot', physical / 'boot')
             run('ostree', 'admin', f'--sysroot={physical}', 'init-fs', physical)
             repo = physical / 'ostree/repo'
             run('ostree', f'--repo={repo}', 'config', 'set', 'sysroot.bootloader', 'none')

@@ -19,6 +19,28 @@ for command in ('aplay', 'arecord', 'alsamixer', 'pw-cli', 'pw-dump', 'pw-top',
                 'cam', 'ideviceinfo', 'ratbagd', 'pamu2fcfg'):
     assert shutil.which(command), f'Missing hardware/diagnostic command: {command}'
 
+# Core QEMU packages must retain the guest integrations used by virt-manager.
+for command in ('qemu-system-x86_64', 'qemu-system-aarch64', 'qemu-system-arm',
+                'qemu-img', 'virt-manager', 'virt-install', 'swtpm'):
+    assert shutil.which(command), f'Missing virtualization command: {command}'
+for binary in ('qemu-system-x86_64', 'qemu-system-aarch64', 'qemu-system-arm'):
+    subprocess.run([binary, '--version'], check=True, stdout=subprocess.DEVNULL)
+devices = subprocess.check_output(['qemu-system-x86_64', '-device', 'help'], text=True)
+for device in ('virtio-vga-gl', 'virtio-gpu-gl-pci', 'qxl', 'usb-host', 'usb-redir'):
+    assert f'name "{device}"' in devices, f'Missing QEMU guest device: {device}'
+displays = subprocess.check_output(['qemu-system-x86_64', '-display', 'help'], text=True)
+assert 'egl-headless' in displays, 'Headless accelerated guests require EGL'
+accelerators = subprocess.check_output(['qemu-system-x86_64', '-accel', 'help'], text=True)
+assert 'kvm' in accelerators.splitlines(), 'x86 guests require KVM support'
+subprocess.run(['rpm', '-q', 'qemu-ui-spice-core', 'qemu-audio-spice',
+                'qemu-audio-pipewire', 'qemu-char-spice', 'edk2-ovmf',
+                'edk2-aarch64', 'qemu-user-static-aarch64', 'qemu-user-static-arm'],
+               check=True, stdout=subprocess.DEVNULL)
+assert not subprocess.check_output(['rpm', '-qa', '--qf', '%{NAME}\n',
+                                   'qemu-block-rbd', 'qemu-block-gluster',
+                                   'qemu-block-iscsi', 'qemu-user-static'], text=True).strip(), \
+    'Unrequested QEMU umbrella packages or remote-storage backends'
+
 require_file('/usr/share/alsa/ucm2/ucm.conf')
 # Check libraries and dynamic drivers without requiring a display or GPU.
 for library in ('libva.so.2', 'libOpenCL.so.1', 'libheif.so.1', 'libopenh264.so.8'):

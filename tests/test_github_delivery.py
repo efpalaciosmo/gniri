@@ -248,6 +248,20 @@ class DeliveryWorkflowTests(unittest.TestCase):
         self.assertIn('"DOCKER_CONFIG=$HOME/.docker"', workflow)
         self.assertNotIn('workflow_run:', workflow)
 
+    def test_regular_builds_publish_latest_after_signature_and_policy_checks(self):
+        workflow = (ROOT / '.github/workflows/iso.yml').read_text()
+        build, rest = workflow.split('  iso:', 1)
+        self.assertIn('--revision "$GITHUB_SHA" --fresh', build)
+        self.assertIn('--report output/inventory/image-size.json', build)
+        self.assertIn('"docker://$IMAGE@$digest" "docker://$IMAGE:latest"', build)
+        self.assertLess(build.index('cosign sign --yes'), build.index('"docker://$IMAGE:latest"'))
+        self.assertLess(build.index('bash scripts/check-registry-policy.sh'),
+                        build.index('"docker://$IMAGE:latest"'))
+        self.assertIn('test "$actual" = "$digest"', build)
+        iso = rest.split('  promote:', 1)[0]
+        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.build_iso", iso)
+        self.assertIn('default: false', workflow.split('      evidence:', 1)[0])
+
     def test_only_protected_promotion_publishes_a_release_without_rebuilding(self):
         workflow = (ROOT / '.github/workflows/iso.yml').read_text().split('  promote:', 1)[1]
         self.assertIn('environment: stable', workflow)

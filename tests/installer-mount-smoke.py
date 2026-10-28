@@ -26,7 +26,7 @@ def check_layout(home_mount, var_mount, separate_boot):
         try:
             for root in (physical, deployment):
                 root.mkdir()
-                mount('-t', 'tmpfs', 'tmpfs', root)
+                mount('-t', 'tmpfs', f'gniri-{root.name}', root)
 
             points = {'/': 'root', '/boot/efi': 'efi'}
             if separate_boot:
@@ -38,7 +38,7 @@ def check_layout(home_mount, var_mount, separate_boot):
             for point in sorted(set(points) - {'/'}, key=lambda p: p.count('/')):
                 target = physical / point.lstrip('/')
                 target.mkdir(parents=True, exist_ok=True)
-                mount('-t', 'tmpfs', 'tmpfs', target)
+                mount('-t', 'tmpfs', f'gniri-{points[point]}', target)
             scratch = physical / 'root'
             scratch.mkdir()
             (scratch / 'installer-only').touch()

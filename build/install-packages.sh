@@ -5,6 +5,7 @@ mapfile -t packages < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' /run/gniri-build
 source /usr/lib/os-release
 [[ $ID == fedora && $VERSION_ID =~ ^[0-9]+$ && ${RELEASE_TYPE:-} == stable ]]
 packages+=("f${VERSION_ID}-backgrounds-gnome")
+dnf=(dnf5 -y --setopt=keepcache=True --setopt=install_weak_deps=False --setopt=tsflags=nodocs)
 # Restrict this community repository to Ghostty; all other RPMs stay on Fedora.
 # Source documented at https://ghostty.org/docs/install/binary#fedora.
 cat > /etc/yum.repos.d/ghostty.repo <<'EOF'
@@ -18,10 +19,24 @@ repo_gpgcheck=0
 gpgkey=https://download.copr.fedorainfracloud.org/results/scottames/ghostty/pubkey.gpg
 includepkgs=ghostty
 EOF
-dnf5 -y --refresh --setopt=keepcache=True --setopt=install_weak_deps=False upgrade
-dnf5 -y --setopt=keepcache=True --setopt=install_weak_deps=False install "${packages[@]}"
+"${dnf[@]}" --refresh upgrade
+"${dnf[@]}" install "${packages[@]}"
 
-# Tailscale's official stable repository is the only external RPM source.
+# Fedora's base can include the umbrella binfmt package and emulators for every
+# CPU. Retain ARM/AArch64 containers; remove only the other installed emulators.
+# Do not autoremove unrelated packages inherited from the official base.
+unused_emulators=()
+while IFS= read -r package; do
+    case "$package" in
+        qemu-user-static-aarch64|qemu-user-static-arm) ;;
+        qemu-user-static|qemu-user-static-*) unused_emulators+=("$package") ;;
+    esac
+done < <(rpm -qa --qf '%{NAME}\n' 'qemu-user-static*')
+if ((${#unused_emulators[@]})); then
+    "${dnf[@]}" --setopt=clean_requirements_on_remove=False remove "${unused_emulators[@]}"
+fi
+
+# Tailscale uses its official stable repository, restricted to its own RPM.
 cat > /etc/yum.repos.d/tailscale.repo <<'EOF'
 [tailscale-stable]
 name=Tailscale stable
@@ -32,7 +47,7 @@ gpgcheck=1
 gpgkey=https://pkgs.tailscale.com/stable/fedora/repo.gpg
 includepkgs=tailscale
 EOF
-dnf5 -y --setopt=keepcache=True --setopt=install_weak_deps=False install tailscale
+"${dnf[@]}" install tailscale
 
 # An RPM must not provision Flatpak remotes behind our back.
 # Refuse unexpected content instead of silently removing installed applications.

@@ -40,8 +40,17 @@ make iso    # Local: no requiere cuenta GitHub ni publicar la imagen.
 Los builds locales reutilizan capas y omiten repacking para iterar más rápido.
 `RECHUNK=1` reorganiza y valida las capas OCI; CI lo activa para candidatos firmados.
 
-En GitHub, el pipeline de `main` publica un candidato firmado y genera su ISO
-x86_64 automáticamente. Tras pruebas reales y promoción aprobada, publica el mismo
+En GitHub, **Build and publish image** publica una imagen firmada en GHCR por cambios
+en `main` y **cada sábado a las 05:00 de Bogotá (10:00 UTC)**. Puedes descargarla:
+
+```sh
+docker pull ghcr.io/efpalaciosmo/gniri:latest
+# También: podman pull ghcr.io/efpalaciosmo/gniri:latest
+```
+
+`latest` es el candidato más reciente; las instalaciones siguen el canal revisado
+`stable`. El único workflow permite generar la ISO x86_64 marcando `build_iso` en
+una ejecución manual. Tras pruebas reales y promoción aprobada, publica el mismo
 payload en `stable` y la ISO revisada en **Releases**, con checksums firmados.
 La [guía de construcción](docs/building.md#github-configuración-inicial) describe
 secretos, protecciones, artefactos y verificación de las partes de descarga.

@@ -3,12 +3,15 @@ import json
 import os
 from pathlib import Path
 import runpy
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPARE = runpy.run_path(str(ROOT / 'scripts/compare-oci.py'))['compare']
 COMPARE_TREES = runpy.run_path(str(ROOT / 'tests/rechunk-smoke.py'))['compare_trees']
+RECHUNK = runpy.run_path(str(ROOT / 'scripts/rechunk-image.py'))
 
 
 def layout(root, contents, compression='gzip'):
@@ -47,6 +50,27 @@ class OciComparisonTests(unittest.TestCase):
             layout(root / 'after', [b'two'], 'zstd')
             with self.assertRaisesRegex(AssertionError, 'same layer compression'):
                 COMPARE(root / 'before', root / 'after')
+
+
+class RechunkReportTests(unittest.TestCase):
+    def test_report_survives_temporary_oci_cleanup(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            report = root / 'inventory/image-size.json'
+            workdirs = []
+            metrics = {'result_layer_bytes_gzip': 123, 'result_size_bytes_podman': 456}
+
+            def rechunk(source, destination, work):
+                workdirs.append(work)
+                (work / 'large-oci-blob').write_bytes(b'blob')
+                return metrics
+
+            with patch.object(sys, 'argv', ['rechunk-image.py', 'source', '--report', str(report)]), \
+                    patch.dict(RECHUNK['main'].__globals__, {'ROOT': root, 'rechunk': rechunk}):
+                RECHUNK['main']()
+            self.assertEqual(json.loads(report.read_text()), metrics)
+            self.assertEqual(len(workdirs), 1)
+            self.assertFalse(workdirs[0].exists())
 
 
 class RechunkContentTests(unittest.TestCase):

@@ -1,4 +1,5 @@
 # x86_64 KVM + ARM TCG emulation, NAT/bridging, UEFI and virtual TPM.
+# Use core emulators: umbrella RPMs require every audio/UI/storage backend.
 edk2-aarch64
 edk2-ovmf
 libvirt-client
@@ -13,12 +14,24 @@ libvirt-daemon-driver-storage-core
 libvirt-daemon-lock
 libvirt-daemon-proxy
 qemu-device-display-virtio-gpu-gl
+qemu-device-display-virtio-gpu-pci-gl
+qemu-device-display-virtio-vga-gl
+qemu-device-display-qxl
+qemu-device-usb-host
+qemu-device-usb-redirect
+qemu-char-spice
+qemu-audio-pipewire
+qemu-audio-spice
 qemu-img
-qemu-kvm
-qemu-system-aarch64
-qemu-system-arm
+qemu-system-x86-core
+qemu-system-aarch64-core
+qemu-system-arm-core
+qemu-ui-egl-headless
 qemu-ui-opengl
 qemu-ui-spice-core
+# Keep ARM containers in Distrobox without every foreign-architecture emulator.
+qemu-user-static-aarch64
+qemu-user-static-arm
 swtpm
 swtpm-tools
 virglrenderer

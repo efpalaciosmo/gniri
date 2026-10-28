@@ -21,6 +21,13 @@ oficial; Ghostty usa el COPR `scottames/ghostty`, limitado a ese paquete y con
 verificación de firmas RPM. [Las descargas upstream](../build/upstream.env) tienen versión/checksum
 fijos. Los RPM siguen repositorios vivos: no hay reproducibilidad bit a bit.
 
+Las transacciones omiten documentación RPM (`tsflags=nodocs`), conservando licencias.
+QEMU usa emuladores `-core` y módulos explícitos para KVM x86_64, ARM, SPICE,
+OpenGL, audio PipeWire y USB. No instala los metapaquetes que exigen todos los
+backends de almacenamiento y todas las interfaces. Del binfmt heredado conserva
+ARM/AArch64 para contenedores; elimina emuladores de las otras arquitecturas.
+Se conservan firmware, microcódigo y traducciones del escritorio.
+
 ## Construcción local
 
 Desde la raíz del repositorio: Linux x86_64, Podman, Make, Python 3, Internet y
@@ -146,27 +153,36 @@ artefactos externo: imágenes en GHCR, candidatos/logs en Actions y versiones en
 ```text
 PR → checks + imagen local (sin publicar ni usar secretos de firma)
 main / sábado / ejecución manual → imagen firmada por digest
-                                → ISO x86_64 + regresiones de instalador
+                                → etiqueta latest + inventarios y tamaños
+manual con build_iso            → también ISO x86_64 + regresiones de instalador
                                 → artefactos Actions + validation.json sin aprobar
 pruebas reales → PR de evidencia → aprobación del entorno stable
               → verificar ISO descargada → firmar checksums → Release borrador
               → promover el mismo digest a stable → publicar GitHub Release
 ```
 
-1. **Build installer ISO** es el único workflow. Desde `main`, construye la imagen,
+1. **Build and publish image** es el único workflow (`.github/workflows/iso.yml`). Desde `main`, construye la imagen,
    valida Ghostty/Niri, repackea y firma el candidato `sha-COMMIT-RUN_ID-ATTEMPT`;
-   **no escribe `:stable`**. Se ejecuta por cambios de código, manualmente sin
-   rellenar `evidence` y los sábados a las 06:20 UTC. Las PR solo construyen y
+   tras las regresiones actualiza `:latest` al mismo digest firmado y **no escribe
+   `:stable`**. Se ejecuta por cambios de código, manualmente sin
+   rellenar `evidence` y los sábados a las **05:00 de Bogotá (10:00 UTC)**. Cada build
+   renueva las transacciones RPM aunque la base estable no haya cambiado.
+   Las PR solo construyen y
    validan la imagen, sin secretos ni publicación. Los checks de fuentes corren
-   una vez; no hay un workflow de checks duplicado.
-2. El job ISO usa **el digest exacto** del job de imagen, en otro runner para
+   una vez; no hay un workflow de checks duplicado. El resumen y el artefacto
+   `gniri-candidate-inventory-ATTEMPT` incluyen `image-size.json`: tamaño sin
+   comprimir y bytes gzip de las capas. El repacking descarta los blobs temporales.
+   Descarga con `docker pull ghcr.io/efpalaciosmo/gniri:latest` o `podman pull`.
+   GitHub puede retrasar el inicio programado durante períodos de alta carga.
+2. El job ISO se activa únicamente en ejecuciones manuales con **`build_iso=true`**.
+   Usa **el digest exacto** del job de imagen, en otro runner para
    limitar espacio máximo. Verifica Cosign y ejecuta las regresiones de montajes
    y finalización. No requiere copiar un digest manualmente. La preparación RPM
    del instalador y su initramfs se pueden reutilizar al cambiar solo el payload.
 3. Descarga `gniri-installer-x86_64-ATTEMPT` del run: contiene ISO, `SHA256SUMS`,
    `build.json` y `validation.json` con resultados `untested`. También se conservan
    inventarios y logs. No mezcles artefactos de intentos diferentes.
-4. Para promover una ISO ya revisada, ejecuta **Build installer ISO** desde `main`
+4. Para promover una ISO ya revisada, ejecuta **Build and publish image** desde `main`
    con `evidence=release-evidence/NOMBRE.json`. Ese modo omite los builds y usa el
    job protegido por el entorno `stable`; verifica la ISO exacta antes de promover.
    Para generar localmente una ISO de un candidato firmado existente:
@@ -191,7 +207,7 @@ pruebas reales → PR de evidencia → aprobación del entorno stable
    credenciales, datos personales ni discos VM. Los artefactos Actions caducan a los
    30 días (o antes si la política del repositorio impone menos); promueve antes de
    que caduquen. Si reconstruyes o reejecutas, vuelve a comprobar la nueva ISO y evidencia.
-7. Ejecuta **Build installer ISO** (con `evidence`) desde `main`, indicando esa ruta.
+7. Ejecuta **Build and publish image** (con `evidence`) desde `main`, indicando esa ruta.
    Tras el gate y aprobación, descarga el artefacto del run/intento revisados. Exige
    un run correcto de `main` en este repositorio y comprueba SHA-256 real de ISO,
    metadatos, revisión de instalador y payload frente a la evidencia. No reconstruye.

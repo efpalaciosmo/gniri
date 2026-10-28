@@ -62,8 +62,8 @@ class UpdateTests(unittest.TestCase):
 
     def test_scheduled_publication_is_weekly_not_daily(self):
         text = (ROOT / '.github/workflows/iso.yml').read_text()
-        self.assertIn("cron: '20 6 * * 6'", text)
-        self.assertNotIn("cron: '20 6 * * *'", text)
+        self.assertIn("cron: '0 10 * * 6'", text)
+        self.assertEqual(text.count('cron:'), 1)
 
     def test_builds_never_promote_stable(self):
         text = (ROOT / '.github/workflows/iso.yml').read_text()
