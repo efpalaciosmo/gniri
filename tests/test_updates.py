@@ -61,20 +61,18 @@ class UpdateTests(unittest.TestCase):
         self.assertIn('RandomizedDelaySec=30min', text)
 
     def test_scheduled_publication_is_weekly_not_daily(self):
-        text = (ROOT / '.github/workflows/iso.yml').read_text()
+        text = (ROOT / '.github/workflows/build.yml').read_text()
         self.assertIn("cron: '0 10 * * 6'", text)
         self.assertEqual(text.count('cron:'), 1)
 
     def test_builds_never_promote_stable(self):
-        text = (ROOT / '.github/workflows/iso.yml').read_text()
+        text = (ROOT / '.github/workflows/build.yml').read_text()
         guard = "github.event_name != 'pull_request' && github.ref == 'refs/heads/main'"
         self.assertGreaterEqual(text.count(guard), 3)
         self.assertIn('persist-credentials: false', text)
         self.assertNotRegex(text, r'podman push[^\n]+"\$IMAGE:stable"')
-        promotion = (ROOT / '.github/workflows/iso.yml').read_text()
-        self.assertIn('environment: stable', promotion)
-        self.assertIn('release-gate.py validate', promotion)
-        self.assertIn('--preserve-digests', promotion)
+        self.assertNotRegex(text, r'"docker://[^"\n]+:stable"')
+        self.assertIn('--preserve-digests', text)
 
     def test_image_metadata_is_after_expensive_package_layers(self):
         text = (ROOT / 'Containerfile').read_text()

@@ -122,10 +122,10 @@ elif name != 'cosign':
         self.assertNotIn('--tls-verify=false', smoke)
 
     def test_real_transport_regression_runs_before_publication_even_for_pull_requests(self):
-        workflow = (ROOT / '.github/workflows/iso.yml').read_text()
+        workflow = (ROOT / '.github/workflows/build.yml').read_text()
         step = workflow.split('      - name: Offline signature transport regression\n', 1)[1].split('      - ', 1)[0]
         self.assertNotIn('if:', step)
         self.assertIn('--network=none', step)
         self.assertIn('localhost/gniri:build /src/tests/signature-transport-smoke.py', step)
         self.assertLess(workflow.index('Offline signature transport regression'),
-                        workflow.index('name: Publish signed candidate'))
+                        workflow.index('name: Publish signed image to GHCR'))

@@ -235,22 +235,25 @@ elif sys.argv[2] == 'upload':
 
 
 class DeliveryWorkflowTests(unittest.TestCase):
-    def test_single_workflow_builds_and_passes_the_exact_signed_digest(self):
+    def test_single_workflow_has_only_the_ghcr_image_job(self):
         workflows = ROOT / '.github/workflows'
-        self.assertEqual([p.name for p in workflows.glob('*.yml')], ['iso.yml'])
-        workflow = (workflows / 'iso.yml').read_text()
+        self.assertEqual(sorted(p.name for p in workflows.iterdir() if p.suffix in {'.yml', '.yaml'}),
+                         ['build.yml'])
+        workflow = (workflows / 'build.yml').read_text()
+        jobs = workflow.split('\njobs:\n', 1)[1]
+        self.assertEqual(re.findall(r'^  ([\w-]+):$', jobs, re.MULTILINE), ['build'])
         self.assertNotIn('workflow_call:', workflow)
-        self.assertNotIn('payload_digest:', workflow.split('permissions:', 1)[0])
-        self.assertIn('needs: build', workflow)
-        self.assertIn('PAYLOAD_DIGEST: ${{ needs.build.outputs.digest }}', workflow)
-        self.assertIn('digest: ${{ steps.publish.outputs.digest }}', workflow)
-        self.assertIn('name: gniri-installer-x86_64-${{ github.run_attempt }}', workflow)
-        self.assertIn('"DOCKER_CONFIG=$HOME/.docker"', workflow)
         self.assertNotIn('workflow_run:', workflow)
+        self.assertNotIn('inputs.', workflow)
+        self.assertNotIn('build-iso.sh', workflow)
+        self.assertNotIn('release-gate.py', workflow)
+        self.assertIn('workflow_dispatch:', workflow)
+        self.assertIn('packages: write', jobs)
+        self.assertIn('name: Publish signed image to GHCR', jobs)
 
     def test_regular_builds_publish_latest_after_signature_and_policy_checks(self):
-        workflow = (ROOT / '.github/workflows/iso.yml').read_text()
-        build, rest = workflow.split('  iso:', 1)
+        workflow = (ROOT / '.github/workflows/build.yml').read_text()
+        build = workflow
         self.assertIn('--revision "$GITHUB_SHA" --fresh', build)
         self.assertIn('--report output/inventory/image-size.json', build)
         self.assertIn('"docker://$IMAGE@$digest" "docker://$IMAGE:latest"', build)
@@ -258,24 +261,14 @@ class DeliveryWorkflowTests(unittest.TestCase):
         self.assertLess(build.index('bash scripts/check-registry-policy.sh'),
                         build.index('"docker://$IMAGE:latest"'))
         self.assertIn('test "$actual" = "$digest"', build)
-        iso = rest.split('  promote:', 1)[0]
-        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.build_iso", iso)
-        self.assertIn('default: false', workflow.split('      evidence:', 1)[0])
 
-    def test_only_protected_promotion_publishes_a_release_without_rebuilding(self):
-        workflow = (ROOT / '.github/workflows/iso.yml').read_text().split('  promote:', 1)[1]
-        self.assertIn('environment: stable', workflow)
-        self.assertIn("inputs.evidence != '' && github.ref == 'refs/heads/main'", workflow)
-        self.assertIn('actions: read', workflow)
-        self.assertIn('contents: write', workflow)
-        self.assertIn('gh run download', workflow)
-        self.assertIn('prepare-release.py', workflow)
-        self.assertIn('cosign sign-blob', workflow)
-        self.assertLess(workflow.index('prepare-release.py'), workflow.index('stage-github-release.sh'))
-        self.assertLess(workflow.index('stage-github-release.sh'), workflow.index('skopeo copy'))
-        self.assertLess(workflow.index('skopeo copy'), workflow.index('gh release edit'))
-        self.assertNotIn('build-iso.sh', workflow)
-        self.assertNotIn('make build', workflow)
+    def test_image_workflow_cannot_publish_github_releases_or_deployments(self):
+        workflow = (ROOT / '.github/workflows/build.yml').read_text()
+        self.assertNotIn('contents: write', workflow)
+        self.assertNotIn('environment:', workflow)
+        self.assertNotIn('gh release', workflow)
+        self.assertNotIn('stage-github-release.sh', workflow)
+        self.assertNotIn('prepare-release.py', workflow)
 
     def test_actions_are_pinned_and_dependency_bots_do_not_overlap(self):
         for path in (ROOT / '.github/workflows').glob('*.yml'):

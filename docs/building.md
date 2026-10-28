@@ -97,139 +97,82 @@ SELinux es permisivo **solo en el instalador**; el destino solicita Enforcing.
 
 ## GitHub: configuración inicial
 
-La configuración del entorno se puede aplicar sin usar el dashboard, con Python 3
-y GitHub CLI autenticado como administrador del repositorio. Revisa primero el
-contenido **y todo el historial** antes de autorizar que se hagan públicos; por
-ejemplo, escanéalos con Gitleaks. Después ejecuta:
+El workflow de imagen necesita los secretos Actions `COSIGN_PRIVATE_KEY` y
+`COSIGN_PASSWORD`, además de la clave pública correspondiente en `trust/cosign.pub`.
+Conserva las claves existentes; no las regeneres para repetir una construcción.
+`GITHUB_TOKEN` lo proporciona Actions con permiso `packages: write`; no necesitas
+un PAT para publicar desde CI. Las firmas OCI autentican la imagen y las
+actualizaciones; no sustituyen Secure Boot.
 
-```sh
-python3 scripts/setup-github.py --repository efpalaciosmo/gniri \
-  --reviewer efpalaciosmo --make-public
-```
+En la configuración del paquete GHCR, permite al repositorio acceso Actions de
+lectura/escritura. Para descargar un paquete privado, inicia sesión con
+`docker login ghcr.io -u OWNER` (o `podman login`) y usa como contraseña un token
+clásico con `read:packages`.
 
-El script comprueba que ya existan los secretos de firma, hace público el
-repositorio solo con autorización explícita, crea/configura `stable` con ese
-revisor y limita deployments a la rama `main`. Verifica el resultado por API;
-se puede repetir sin `--make-public` una vez público. No genera ni rota claves,
-no borra políticas inesperadas ni aprueba deployments. Para un mantenedor único
-permite aprobar manualmente sus propios runs; no realiza aprobación automática.
-Los revisores obligatorios en repositorios privados no están disponibles con
-GitHub Free/Pro/Team, de ahí el repositorio público para este flujo.
+Para descargas y actualizaciones sin credenciales, haz público el paquete en
+**Package settings → Change visibility → Public**:
+`https://github.com/users/OWNER/packages/container/gniri/settings`.
+Hacer público el repositorio no hace público el paquete; cambiar la visibilidad
+del paquete a pública es irreversible. La API documentada de GitHub no permite
+automatizar ese cambio.
 
-Requisitos que comprueba o utiliza la configuración:
+Los Actions están fijados por SHA. Dependabot propone sus actualizaciones
+semanalmente; Renovate gestiona las imágenes OCI y herramientas fijadas en
+scripts. Protege `main` con revisión y checks requeridos de sintaxis/tests e imagen.
 
-1. Genera claves con `cosign generate-key-pair`. Guarda la privada fuera del
-   repositorio; en `trust/` conserva **solo material público** (`cosign.pub`).
-   En **Settings → Secrets and variables → Actions**, configura `COSIGN_PRIVATE_KEY`
-   (contenido cifrado) y `COSIGN_PASSWORD`. Se usan para candidatos y para firmar
-   checksums en promoción. `GITHUB_TOKEN` lo proporciona Actions; no necesitas un PAT.
-   Si ambos secretos ya existen, consérvalos: no generes otro par para repetir el
-   setup. Las firmas OCI autentican actualizaciones, no sustituyen Secure Boot.
-2. Haz público `ghcr.io/OWNER/gniri` para permitir actualizaciones sin credenciales
-   en el equipo. En la configuración del paquete, permite al repositorio acceso
-   Actions de lectura/escritura. CI puede validar candidatos privados, pero la
-   promoción exige acceso anónimo al payload antes de actualizar `stable`.
-   **Excepción de automatización:** la API documentada de GitHub no permite cambiar
-   la visibilidad de paquetes. Si falla el acceso anónimo, debes hacer una vez
-   **Package settings → Change visibility → Public** en
-   `https://github.com/users/OWNER/packages/container/gniri/settings`. Hacer público
-   el repositorio no hace público el paquete; esta última operación es irreversible.
-3. `scripts/setup-github.py` configura **`stable` con revisor obligatorio y solo
-   `main`**. El YAML por sí solo no crea estas protecciones. No ejecutes promociones
-   si el script no confirma el resultado. No necesita un token administrador
-   adicional en Actions: el bootstrap usa tu sesión local de `gh`.
-4. Protege `main` con revisión de PR y checks requeridos de sintaxis/tests e imagen.
-   Permite los Actions fijados por SHA que usan los workflows. Solo promoción
-   necesita `contents: write` para Releases; el resto conserva permisos mínimos.
-   Es recomendable activar inmutabilidad de Releases en GitHub.
+## Pipeline de imagen en GHCR
 
-Dependabot propone actualizaciones de Actions semanalmente; sus referencias
-siguen fijadas por SHA. Renovate queda a cargo de imágenes OCI y herramientas
-fijadas en scripts, sin duplicar las PR de Actions. No hay S3 ni otro almacén de
-artefactos externo: imágenes en GHCR, candidatos/logs en Actions y versiones en Releases.
-
-## Pipeline de candidatos y releases
+[`.github/workflows/build.yml`](../.github/workflows/build.yml) es el único
+workflow del repositorio y contiene un solo job, `build`. Se ejecuta por cambios
+de código en `main`, por pull requests, manualmente sin parámetros y los sábados
+a las **05:00 de Bogotá (10:00 UTC)**. GitHub puede retrasar el inicio programado
+durante períodos de alta carga.
 
 ```text
-PR → checks + imagen local (sin publicar ni usar secretos de firma)
-main / sábado / ejecución manual → imagen firmada por digest
-                                → etiqueta latest + inventarios y tamaños
-manual con build_iso            → también ISO x86_64 + regresiones de instalador
-                                → artefactos Actions + validation.json sin aprobar
-pruebas reales → PR de evidencia → aprobación del entorno stable
-              → verificar ISO descargada → firmar checksums → Release borrador
-              → promover el mismo digest a stable → publicar GitHub Release
+PR → build: checks + construcción y regresiones de imagen
+main / sábado / ejecución manual → build: checks + construcción y regresiones
+                                        → firma por digest → GHCR :latest
+                                        → inventarios y tamaños en Actions
 ```
 
-1. **Build and publish image** es el único workflow (`.github/workflows/iso.yml`). Desde `main`, construye la imagen,
-   valida Ghostty/Niri, repackea y firma el candidato `sha-COMMIT-RUN_ID-ATTEMPT`;
-   tras las regresiones actualiza `:latest` al mismo digest firmado y **no escribe
-   `:stable`**. Se ejecuta por cambios de código, manualmente sin
-   rellenar `evidence` y los sábados a las **05:00 de Bogotá (10:00 UTC)**. Cada build
-   renueva las transacciones RPM aunque la base estable no haya cambiado.
-   Las PR solo construyen y
-   validan la imagen, sin secretos ni publicación. Los checks de fuentes corren
-   una vez; no hay un workflow de checks duplicado. El resumen y el artefacto
-   `gniri-candidate-inventory-ATTEMPT` incluyen `image-size.json`: tamaño sin
-   comprimir y bytes gzip de las capas. El repacking descarta los blobs temporales.
-   Descarga con `docker pull ghcr.io/efpalaciosmo/gniri:latest` o `podman pull`.
-   Si el paquete es privado, inicia sesión antes con `docker login ghcr.io -u OWNER`
-   (o `podman login`) usando un token clásico con `read:packages` como contraseña.
-   El repositorio público no implica que su paquete GHCR sea público; consulta la
-   configuración inicial para habilitar descargas anónimas.
-   GitHub puede retrasar el inicio programado durante períodos de alta carga.
-2. El job ISO se activa únicamente en ejecuciones manuales con **`build_iso=true`**.
-   Usa **el digest exacto** del job de imagen, en otro runner para
-   limitar espacio máximo. Verifica Cosign y ejecuta las regresiones de montajes
-   y finalización. No requiere copiar un digest manualmente. La preparación RPM
-   del instalador y su initramfs se pueden reutilizar al cambiar solo el payload.
-3. Descarga `gniri-installer-x86_64-ATTEMPT` del run: contiene ISO, `SHA256SUMS`,
-   `build.json` y `validation.json` con resultados `untested`. También se conservan
-   inventarios y logs. No mezcles artefactos de intentos diferentes.
-4. Para promover una ISO ya revisada, ejecuta **Build and publish image** desde `main`
-   con `evidence=release-evidence/NOMBRE.json`. Ese modo omite los builds y usa el
-   job protegido por el entorno `stable`; verifica la ISO exacta antes de promover.
-   Para generar localmente una ISO de un candidato firmado existente:
+Las PR no publican ni usan secretos de firma. Desde `main`, el mismo job renueva
+las transacciones RPM, construye, repackea y valida Ghostty/Niri, Flatpak y
+políticas de firmas. Publica un candidato inmutable
+`sha-COMMIT-RUN_ID-ATTEMPT`, lo firma y verifica en GHCR; después actualiza `:latest`
+al mismo digest. No hay jobs de ISO, promoción, deployments ni GitHub Releases.
 
-   ```sh
-   make iso-published REFRESH=1 \
-     PAYLOAD_REF=ghcr.io/owner/gniri@sha256:DIGEST \
-     TARGET_REF=ghcr.io/owner/gniri:stable
-   ```
+El resumen incluye el comando de descarga, digest y tamaños. El artefacto
+`gniri-candidate-inventory-ATTEMPT` contiene inventarios de paquetes/lanzadores,
+metadatos, digest e `image-size.json`: tamaño sin comprimir y bytes gzip de las
+capas. Se conserva 30 días; los blobs OCI temporales se descartan tras validarlos.
 
-   Los flujos verifican Cosign antes de descargar el payload. El flujo local publicado
-   requiere Cosign en el `PATH` de root. El instalador apunta al futuro `:stable`;
-   desactiva las actualizaciones en la VM de candidatos antes de darle acceso al registro.
-5. Completa las [pruebas](testing.md) con la ISO descargada. No se pueden demostrar
-   Secure Boot, sesiones reales ni hardware simplemente construyendo en un runner.
-   Conserva logs redactados y evidencia duradera, por ejemplo adjuntos de una issue
-   GitHub pública; no uses solo URLs de logs/artefactos Actions que caducan.
-6. Completa el `validation.json` de **esa ISO**, guarda el resultado revisado en
-   `release-evidence/NOMBRE.json` mediante
-   commit/PR. Solo resultados realmente obtenidos para ese digest, revisión e ISO,
-   con URLs HTTPS duraderas. Conserva su run/intento exactos. No incluyas claves,
-   credenciales, datos personales ni discos VM. Los artefactos Actions caducan a los
-   30 días (o antes si la política del repositorio impone menos); promueve antes de
-   que caduquen. Si reconstruyes o reejecutas, vuelve a comprobar la nueva ISO y evidencia.
-7. Ejecuta **Build and publish image** (con `evidence`) desde `main`, indicando esa ruta.
-   Tras el gate y aprobación, descarga el artefacto del run/intento revisados. Exige
-   un run correcto de `main` en este repositorio y comprueba SHA-256 real de ISO,
-   metadatos, revisión de instalador y payload frente a la evidencia. No reconstruye.
-   Firma el manifiesto de checksums con Cosign y sube todos los assets a un borrador
-   `gniri-RUN_ID-ATTEMPT`; solo después copia **el mismo digest** a `:stable`, verifica
-   el resultado y publica la Release como latest. El revisor debe leer la evidencia:
-   un JSON no prueba criptográficamente los ensayos.
+```sh
+docker pull ghcr.io/efpalaciosmo/gniri:latest
+# También: podman pull ghcr.io/efpalaciosmo/gniri:latest
+```
 
-Una promoción fallida puede dejar un borrador. Reejecutar permite completar sus
-assets únicamente si conserva la misma revisión y sigue sin publicar; nunca
-sobrescribe una Release publicada. No existe una transacción atómica entre GHCR
-y Releases: si falla publicar después de promover, `stable` ya puede apuntar al
-candidato aprobado y el borrador puede completarse reejecutando la promoción.
-No hay actualización nueva hasta promover un candidato.
+`:latest` identifica la imagen firmada más reciente. El workflow no actualiza
+`:stable`: ese canal requiere evidencia específica revisada y el entorno
+protegido `stable`; no hay promoción automática ni manual en el workflow actual.
+Las instalaciones que ya siguen `:stable` conservan esa referencia.
+
+Las herramientas locales de ISO siguen disponibles. Para crear una ISO de un
+candidato publicado y firmado, usa su digest exacto:
+
+```sh
+make iso-published REFRESH=1 \
+  PAYLOAD_REF=ghcr.io/owner/gniri@sha256:DIGEST \
+  TARGET_REF=ghcr.io/owner/gniri:stable
+```
+
+El script verifica Cosign antes de descargar el payload y requiere Cosign en el
+`PATH` de root. Esa construcción local no promueve el candidato ni publica una
+Release. La ISO necesita las [pruebas de arranque e instalación](testing.md).
 
 ## Descargar y verificar una Release
 
-Las Releases conservan ISO, metadatos y evidencia más allá de la retención de Actions.
+Para Releases históricas o preparadas por separado, verifica sus artefactos firmados.
+El workflow actual no genera ni publica Releases.
 GitHub limita el tamaño de cada asset: las ISOs mayores de 1 GiB se publican en
 partes numeradas de hasta 1 GiB. Descarga **todos los assets** de la Release; las
 partes individuales no son medios instalables. Usa la clave de un checkout de

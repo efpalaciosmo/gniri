@@ -55,11 +55,11 @@ Para descargas sin credenciales, la [configuración inicial](docs/building.md#gi
 explica cómo hacer público el paquete.
 
 `latest` es el candidato más reciente; las instalaciones siguen el canal revisado
-`stable`. El único workflow permite generar la ISO x86_64 marcando `build_iso` en
-una ejecución manual. Tras pruebas reales y promoción aprobada, publica el mismo
-payload en `stable` y la ISO revisada en **Releases**, con checksums firmados.
+`stable`. El único workflow, [`build.yml`](.github/workflows/build.yml), tiene un
+solo job: construir, validar, firmar y publicar la imagen en GHCR. Las ISOs se
+generan localmente con `make iso` o `make iso-published`.
 La [guía de construcción](docs/building.md#github-configuración-inicial) describe
-secretos, protecciones, artefactos y verificación de las partes de descarga.
+secretos, etiquetas e inventarios de la imagen.
 
 > **En desarrollo:** no instalar en el equipo principal hasta probar la ISO,
 > Secure Boot, actualizaciones y rollback en una VM.

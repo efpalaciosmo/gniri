@@ -53,10 +53,10 @@ class IsoReferencesTests(unittest.TestCase):
         self.assertIn('network_args+=(--network="$3")', script)
         self.assertEqual(script.count('"${network_args[@]}"'), 2)
 
-    def test_published_workflow_still_verifies_signatures(self):
-        workflow = (ROOT / '.github/workflows/iso.yml').read_text()
-        self.assertIn('cosign verify --new-bundle-format=false --key trust/cosign.pub', workflow)
-        self.assertIn('bash scripts/build-iso.sh "$image@$digest" "$image:stable"', workflow)
+    def test_local_published_iso_still_verifies_before_pulling_the_payload(self):
+        script = (ROOT / 'scripts/build-iso.sh').read_text()
+        self.assertIn('cosign verify --new-bundle-format=false --key trust/cosign.pub', script)
+        self.assertLess(script.index('cosign verify'), script.index('podman pull "$payload"'))
 
     def test_legacy_payload_base_is_rejected_with_the_correct_rebuild_instructions(self):
         script = (ROOT / 'scripts/build-iso.sh').read_text()

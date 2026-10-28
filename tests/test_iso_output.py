@@ -122,10 +122,3 @@ class IsoOutputTests(unittest.TestCase):
         self.assertIn('-v "$build_dir:/output"', script)
         self.assertIn('| tee output/iso-build.log', script)
         self.assertIn('python3 scripts/publish-iso.py "$build_dir" output/iso', script)
-
-    def test_ci_uploads_the_canonical_artifact(self):
-        workflow = (ROOT / '.github/workflows/iso.yml').read_text()
-        self.assertIn('output/iso/gniri-x86_64.iso', workflow)
-        self.assertIn('output/iso/SHA256SUMS', workflow)
-        self.assertIn('sha256sum --check SHA256SUMS', workflow)
-        self.assertNotIn('find output/iso', workflow)

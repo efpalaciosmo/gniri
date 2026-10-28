@@ -79,12 +79,11 @@ y [comprobación de firmas del destino](https://github.com/containers/image/blob
 La prueba local no certifica que una ejecución posterior de GitHub, la ISO o una
 instalación hayan pasado: esos resultados necesitan sus propios logs y evidencia.
 
-El pipeline de `main` genera después la ISO del digest firmado y adjunta un
-`validation.json` con checksum, revisión y run/intento exactos, **sin marcar ensayos
-como aprobados**. Usa ese archivo para la evidencia revisada. La promoción descarga
-la ISO probada y rechaza otros bytes, metadatos, runs fallidos o procedentes de PR/forks.
-Los unit tests prueban estas guardas y el particionado/reensamblado de assets con
-bytes simulados; no crean por sí solos una release ni validan un arranque.
+El pipeline de `main` publica únicamente la imagen firmada en GHCR y sus
+inventarios. Las ISOs se generan y prueban localmente con `make iso` o
+`make iso-published`; el workflow no crea ISOs ni ejecuta promociones. Los helpers
+de release conservados validan la identidad y bytes de artefactos existentes.
+Sus unit tests usan bytes simulados; no crean una release ni validan un arranque.
 
 ## Gate por candidato
 
