@@ -7,10 +7,12 @@ fails. Keep all other fstab entries and kernel arguments unchanged.
 https://bugzilla.redhat.com/show_bug.cgi?id=2332319
 """
 import argparse
+import json
 import os
 from pathlib import Path
 import shutil
 import shlex
+import re
 import subprocess
 
 
@@ -70,7 +72,32 @@ def verify_arguments(before, after, flags):
         raise RuntimeError('Saved boot arguments do not match the rootflags migration; keeping fstab')
 
 
-def finalize(physical):
+def signed_origin(current, target):
+    if not re.fullmatch(r'ghcr.io/[a-z0-9._/-]+:(stable|latest)', target):
+        raise ValueError('Expected a published stable/latest update target')
+    allowed = ('ostree-unverified-registry:' + target,
+               'ostree-unverified-image:docker://' + target,
+               'ostree-image-signed:docker://' + target)
+    if current not in allowed:
+        raise ValueError('Installed deployment origin differs from the requested update target')
+    return 'ostree-image-signed:docker://' + target
+
+
+def enroll_origin(sysroot, deployment, root, target):
+    repository = target.rsplit(':', 1)[0]
+    policy = json.loads((root / 'usr/share/gniri/bootc-policy.json').read_text())
+    expected = [{'type': 'sigstoreSigned', 'keyPath': '/usr/share/gniri/keys/cosign.pub',
+                 'signedIdentity': {'type': 'matchRepository'}}]
+    if (policy != {'default': [{'type': 'reject'}], 'transports': {'docker': {repository: expected}}}
+            or not (root / 'usr/share/gniri/keys/cosign.pub').read_text().strip()):
+        raise ValueError('Installed image lacks the strict update policy and trust key')
+    origin = deployment.get_origin()
+    origin.set_string('origin', 'container-image-reference',
+                      signed_origin(origin.get_string('origin', 'container-image-reference'), target))
+    sysroot.write_origin_file(deployment, origin, None)
+
+
+def finalize(physical, target=None):
     import gi
     gi.require_version('OSTree', '1.0')
     from gi.repository import Gio, OSTree
@@ -100,6 +127,23 @@ def finalize(physical):
             verify_arguments(before, after, flags)
 
     changed = migrate_fstab(root / 'etc/fstab', existing_flags, write_flags)
+    if target and target != 'localhost/gniri:development':
+        # Use the public OSTree API on the offline target. Enroll before the
+        # first boot so native rpm-ostree cannot start an unverified update.
+        current = OSTree.Sysroot.new(Gio.File.new_for_path(str(physical)))
+        current.load(None)
+        selected, _ = deployment_arguments(current)
+        enroll_origin(current, selected, root, target)
+        saved = OSTree.Sysroot.new(Gio.File.new_for_path(str(physical)))
+        saved.load(None)
+        selected, _ = deployment_arguments(saved)
+        if selected.get_origin().get_string('origin', 'container-image-reference') != \
+                'ostree-image-signed:docker://' + target:
+            raise RuntimeError('Signed update origin did not survive readback')
+        current.unload()
+        saved.unload()
+        print(f'Installed signed update origin: {target}')
+    sysroot.unload()
     print('Root fstab entry migrated to kernel arguments.' if changed else
           'No root fstab migration needed.')
 
@@ -107,8 +151,10 @@ def finalize(physical):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sysroot')
-    target = parser.parse_args().sysroot
-    if target is None:
+    parser.add_argument('--target-ref')
+    args = parser.parse_args()
+    physical = args.sysroot
+    if physical is None:
         from pyanaconda.core.configuration.anaconda import conf
-        target = conf.target.physical_root
-    finalize(target)
+        physical = conf.target.physical_root
+    finalize(physical, args.target_ref)

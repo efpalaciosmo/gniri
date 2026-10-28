@@ -1,4 +1,5 @@
 # GNOME session and integration, not the complete Workstation application set.
+accountsservice
 adwaita-icon-theme
 adwaita-mono-fonts
 adwaita-sans-fonts

@@ -14,6 +14,6 @@ cat > /usr/share/anaconda/interactive-defaults.ks <<EOF
 bootc --source-imgref oci:/usr/share/gniri/installer-payload --target-imgref ${target}
 selinux --enforcing
 %post --nochroot --erroronfail
-/usr/bin/python3 /usr/libexec/gniri-installer-finalize.py
+/usr/bin/python3 /usr/libexec/gniri-installer-finalize.py --target-ref "${target}"
 %end
 EOF

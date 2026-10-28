@@ -36,6 +36,7 @@ if reference.startswith('ghcr.io/'):
 PY
 rpm -q bootupd shim-x64 grub2-efi-x64 kernel-core composefs
 python3 /run/gniri-build/validate-hardware.py
+python3 /run/gniri-build/validate-accounts.py
 grep -qx 'SELINUX=enforcing' /etc/selinux/config
 [[ -d /usr/local/sbin ]]
 for package in firefox fedora-flathub-remote fedora-flatpak-remotes gnome-tour gnome-initial-setup; do

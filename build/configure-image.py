@@ -34,6 +34,13 @@ if reference.startswith('ghcr.io/'):
     policy, bootc_policy = signature_policies(policy, repository)
     policy_path.write_text(json.dumps(policy, indent=2) + '\n')
     (share / 'bootc-policy.json').write_text(json.dumps(bootc_policy, indent=2) + '\n')
+    # rpm-ostree uses a daemon, so a caller's shell environment does not select
+    # its policy. Keep its signed-origin operations on the same strict policy
+    # as bootc, without changing general-purpose Podman/Distrobox defaults.
+    dropin = Path('/usr/lib/systemd/system/rpm-ostreed.service.d')
+    dropin.mkdir(mode=0o755, parents=True, exist_ok=True)
+    (dropin / '10-gniri-policy.conf').write_text(
+        '[Service]\nEnvironment=CONTAINERS_POLICY_JSON=/usr/share/gniri/bootc-policy.json\n')
     registries = Path('/etc/containers/registries.d')
     registries.mkdir(parents=True, exist_ok=True)
     (registries / 'gniri.yaml').write_text(f'docker:\n  {repository}:\n    use-sigstore-attachments: true\n')
@@ -44,6 +51,8 @@ text = release.read_text()
 version = re.search(r'^VERSION_ID=(.+)$', text, flags=re.MULTILINE).group(1).strip('"')
 if not version.isdecimal() or not re.search(r'^RELEASE_TYPE=["\']?stable["\']?$', text, re.MULTILINE):
     raise SystemExit('The stable channel must contain a numbered, released Fedora base, not Rawhide.')
+if len(sys.argv) < 5 or version != sys.argv[4]:
+    raise SystemExit('Fedora version differs from the resolved build input; use scripts/build-image.py.')
 text = re.sub(r'^PRETTY_NAME=.*$', f'PRETTY_NAME="Gniri (Fedora {version})"', text, flags=re.MULTILINE)
 for key, value in (('VARIANT', '"Gniri"'), ('VARIANT_ID', 'gniri'), ('IMAGE_ID', 'gniri')):
     text = re.sub(rf'^{key}=.*\n?', '', text, flags=re.MULTILINE)

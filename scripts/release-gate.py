@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import re
 
-CHECKS = ('offline-install', 'installer-regressions', 'gnome-login', 'niri-login',
+CHECKS = ('offline-install', 'installer-regressions', 'rebase-accounts', 'gnome-login', 'niri-login',
           'secure-boot-install', 'secure-boot-update-rollback', 'selinux-composefs',
           'signed-update', 'unsigned-rejection', 'wrong-key-rejection',
           'lock-suspend', 'hardware', 'data-persistence', 'backup-restore')
