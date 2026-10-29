@@ -176,6 +176,33 @@ validaciones tras la aprobación y se detiene si `stable` cambió entretanto.
 Las instalaciones que ya siguen `:stable` conservan esa referencia; las de
 prueba que siguen `:latest` conservan `:latest`, sin saltar de canal automáticamente.
 
+### Generar una ISO desde GitHub
+
+El workflow manual [Build installer ISO](../.github/workflows/iso.yml) genera una
+ISO desde una imagen GHCR ya firmada, sin reconstruir el escritorio, publicar una
+Release ni modificar `latest` o `stable`:
+
+1. Publica primero una imagen con **Build and publish image**. El paquete debe
+   permitir lectura al repositorio de Actions; `trust/cosign.pub` debe corresponder
+   a la firma. No se necesitan secretos de firma para generar la ISO.
+2. Abre **Actions → Build installer ISO → Run workflow**.
+3. Elige `stable` (predeterminado) o `latest` para probar candidatos. Si todavía
+   no hay una promoción revisada a `stable`, usa `latest`. Opcionalmente indica un
+   digest `sha256:…` firmado del mismo repositorio; si está vacío se resuelve el
+   canal una sola vez. El canal elegido queda como origen de actualizaciones de
+   la instalación, incluso si indicas un digest.
+4. Descarga el artefacto `gniri-iso-CANAL-RUN_ID-ATTEMPT` desde el resumen de la
+   ejecución. Contiene `gniri-x86_64.iso`, `SHA256SUMS` y `build.json`; se conserva
+   **7 días**. Extráelo y ejecuta `sha256sum --check SHA256SUMS` antes de grabarlo.
+
+El workflow verifica la firma antes de descargar el payload, reutiliza su base
+resuelta y ejecuta las regresiones de montajes/finalización del instalador. El
+log `gniri-iso-log-…` se conserva también si falla la generación. No requiere un
+runner propio: usa Ubuntu x86_64 alojado en GitHub con Podman privilegiado. Las
+comprobaciones de contenedor y checksum no sustituyen las pruebas de arranque,
+instalación, Secure Boot ni la evidencia revisada para promover `stable`. El
+checksum del artefacto no lleva una firma independiente de Release.
+
 Las herramientas locales de ISO siguen disponibles. Para crear una ISO de un
 candidato publicado y firmado, usa su digest exacto:
 

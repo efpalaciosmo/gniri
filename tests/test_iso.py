@@ -78,6 +78,9 @@ class IsoReferencesTests(unittest.TestCase):
                         self.assertIn(payload, result.stderr)
                         self.assertIn('lacks a resolved stable base', result.stderr)
                         self.assertIn('make build' if payload == LOCAL else 'signed candidate digest', result.stderr)
+                        if payload != LOCAL:
+                            self.assertIn('Run Build and publish image', result.stderr)
+                            self.assertIn('select latest in Build installer ISO', result.stderr)
 
     def test_generic_iso_has_required_builder_rootfs_metadata(self):
         script = (ROOT / 'scripts/build-iso.sh').read_text()

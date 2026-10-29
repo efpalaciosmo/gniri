@@ -234,11 +234,75 @@ elif sys.argv[2] == 'upload':
         self.assertEqual(result.returncode, 9)
 
 
+class IsoWorkflowResolutionTests(unittest.TestCase):
+    def resolve(self, channel='stable', digest='', **variables):
+        workflow = (ROOT / '.github/workflows/iso.yml').read_text()
+        step = workflow.split('      - name: Resolve installer payload\n', 1)[1]
+        step = step.split('      - name:', 1)[0].split('        run: |\n', 1)[1]
+        script = '\n'.join(line[10:] for line in step.splitlines())
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            log = directory / 'commands.jsonl'
+            output = directory / 'output'
+            client = '''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+name = Path(sys.argv[0]).name
+with open(os.environ['COMMAND_LOG'], 'a') as stream:
+    stream.write(json.dumps([name, *sys.argv[1:]]) + '\\n')
+if name == 'skopeo':
+    print(os.environ['MOCK_DIGEST'])
+if name == 'cosign':
+    sys.exit(int(os.environ.get('VERIFY_EXIT', '0')))
+'''
+            for name in ('skopeo', 'cosign'):
+                path = directory / name
+                path.write_text(client)
+                path.chmod(0o755)
+            sudo = directory / 'sudo'
+            sudo.write_text('#!/usr/bin/env bash\nexec "$@"\n')
+            sudo.chmod(0o755)
+            env = dict(os.environ, PATH=str(directory) + os.pathsep + os.environ['PATH'],
+                       OWNER='Example', CHANNEL=channel, DIGEST=digest, MOCK_DIGEST=DIGEST,
+                       COMMAND_LOG=str(log), GITHUB_OUTPUT=str(output))
+            env.update(variables)
+            result = subprocess.run(['/usr/bin/bash', '-c', script], cwd=ROOT,
+                                    env=env, text=True, capture_output=True)
+            commands = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+            return result, commands, output.read_text() if output.exists() else ''
+
+    def test_channel_is_resolved_once_and_the_same_digest_is_verified(self):
+        for channel in ('stable', 'latest'):
+            with self.subTest(channel=channel):
+                result, calls, output = self.resolve(channel=channel)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual([call[0] for call in calls], ['skopeo', 'cosign'])
+                self.assertEqual(calls[0][-1], f'docker://ghcr.io/example/gniri:{channel}')
+                self.assertEqual(calls[1][-1], f'ghcr.io/example/gniri@{DIGEST}')
+                self.assertIn(f'payload=ghcr.io/example/gniri@{DIGEST}\n', output)
+                self.assertIn(f'target=ghcr.io/example/gniri:{channel}\n', output)
+
+    def test_explicit_digest_does_not_resolve_a_mutable_tag(self):
+        result, calls, output = self.resolve(channel='latest', digest=DIGEST)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([call[0] for call in calls], ['cosign'])
+        self.assertIn(f'payload=ghcr.io/example/gniri@{DIGEST}\n', output)
+
+    def test_invalid_inputs_or_failed_signatures_do_not_emit_build_references(self):
+        for variables in ({'channel': 'other'}, {'digest': 'latest'},
+                          {'digest': DIGEST + '\ninjected=value'},
+                          {'MOCK_DIGEST': 'not-a-digest'}, {'VERIFY_EXIT': '9'}):
+            with self.subTest(variables=variables):
+                result, _, output = self.resolve(**variables)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(output, '')
+
+
 class DeliveryWorkflowTests(unittest.TestCase):
     def test_candidate_build_is_separate_from_protected_promotion(self):
         workflows = ROOT / '.github/workflows'
         self.assertEqual(sorted(p.name for p in workflows.iterdir() if p.suffix in {'.yml', '.yaml'}),
-                         ['build.yml', 'promote.yml'])
+                         ['build.yml', 'iso.yml', 'promote.yml'])
         workflow = (workflows / 'build.yml').read_text()
         jobs = workflow.split('\njobs:\n', 1)[1]
         self.assertEqual(re.findall(r'^  ([\w-]+):$', jobs, re.MULTILINE), ['build'])
@@ -277,6 +341,27 @@ class DeliveryWorkflowTests(unittest.TestCase):
         self.assertNotIn('gh release', workflow)
         self.assertNotIn('stage-github-release.sh', workflow)
         self.assertNotIn('prepare-release.py', workflow)
+
+    def test_iso_workflow_is_manual_read_only_and_uploads_verified_artifacts(self):
+        workflow = (ROOT / '.github/workflows/iso.yml').read_text()
+        self.assertIn('workflow_dispatch:', workflow)
+        self.assertIn('default: stable', workflow)
+        self.assertIn('packages: read', workflow)
+        for forbidden in ('push:', 'pull_request:', 'schedule:', 'workflow_run:',
+                          'contents: write', 'packages: write', 'COSIGN_PRIVATE_KEY',
+                          'cosign sign', 'gh release', 'promote-image.py', 'build-image.py'):
+            self.assertNotIn(forbidden, workflow)
+        self.assertIn('cosign verify --new-bundle-format=false --key trust/cosign.pub', workflow)
+        self.assertLess(workflow.index('cosign verify'), workflow.index('bash scripts/build-iso.sh'))
+        self.assertIn('bash scripts/build-iso.sh "$PAYLOAD_REF" "$TARGET_REF" \'\' 1', workflow)
+        self.assertIn('sudo make check-installer', workflow)
+        self.assertLess(workflow.index('sha256sum --check'), workflow.index('name: Upload installer ISO'))
+        for filename in ('gniri-x86_64.iso', 'SHA256SUMS', 'build.json'):
+            self.assertIn(f'output/iso/{filename}', workflow)
+        self.assertIn('compression-level: 0', workflow)
+        self.assertIn('if-no-files-found: error', workflow)
+        self.assertIn('if: always()', workflow)
+        self.assertIn('path: output/iso-build.log', workflow)
 
     def test_actions_are_pinned_and_dependency_bots_do_not_overlap(self):
         for path in (ROOT / '.github/workflows').glob('*.yml'):

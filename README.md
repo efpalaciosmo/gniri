@@ -63,7 +63,11 @@ explica cómo hacer público el paquete.
 [`promote.yml`](.github/workflows/promote.yml) promueve un digest ya probado,
 sin reconstruirlo, tras validar evidencia y obtener revisión en el entorno
 protegido `stable`. No permite bajar de versión mayor de Fedora.
-Las ISOs se generan localmente; `make iso-candidate PAYLOAD_REF=...` permite
+Para generar una ISO en GitHub, abre **Actions → Build installer ISO → Run workflow**
+y elige `stable` o `latest` (pruebas de candidatos). Descarga el artefacto
+`gniri-iso-…` desde la ejecución; incluye ISO, `SHA256SUMS` y metadatos y se conserva
+7 días. Requiere una imagen firmada ya publicada en el canal elegido; no promueve
+`stable`. También puedes usar `make iso-candidate PAYLOAD_REF=...` localmente para
 probar el candidato siguiendo `latest` sin cambiar el canal de producción.
 La [guía de construcción](docs/building.md#github-configuración-inicial) describe
 secretos, etiquetas e inventarios de la imagen.
