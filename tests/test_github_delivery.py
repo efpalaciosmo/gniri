@@ -263,7 +263,7 @@ if name == 'cosign':
             sudo.write_text('#!/usr/bin/env bash\nexec "$@"\n')
             sudo.chmod(0o755)
             env = dict(os.environ, PATH=str(directory) + os.pathsep + os.environ['PATH'],
-                       OWNER='Example', CHANNEL=channel, DIGEST=digest, MOCK_DIGEST=DIGEST,
+                       OWNER='Example', CHANNEL=channel, REQUESTED_DIGEST=digest, MOCK_DIGEST=DIGEST,
                        COMMAND_LOG=str(log), GITHUB_OUTPUT=str(output))
             env.update(variables)
             result = subprocess.run(['/usr/bin/bash', '-c', script], cwd=ROOT,
@@ -283,6 +283,8 @@ if name == 'cosign':
                 self.assertIn(f'target=ghcr.io/example/gniri:{channel}\n', output)
 
     def test_explicit_digest_does_not_resolve_a_mutable_tag(self):
+        workflow = (ROOT / '.github/workflows/iso.yml').read_text()
+        self.assertIn('REQUESTED_DIGEST: ${{ inputs.digest }}', workflow)
         result, calls, output = self.resolve(channel='latest', digest=DIGEST)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual([call[0] for call in calls], ['cosign'])
@@ -296,6 +298,26 @@ if name == 'cosign':
                 result, _, output = self.resolve(**variables)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(output, '')
+
+    def test_download_summary_renders_references_and_a_checksum_command(self):
+        workflow = (ROOT / '.github/workflows/iso.yml').read_text()
+        step = workflow.split('      - name: Download instructions\n', 1)[1]
+        step = step.split('      - name:', 1)[0].split('        run: |\n', 1)[1]
+        script = '\n'.join(line[10:] for line in step.splitlines())
+        with tempfile.TemporaryDirectory() as temporary:
+            summary = Path(temporary) / 'summary.md'
+            env = dict(os.environ, GITHUB_STEP_SUMMARY=str(summary),
+                       PAYLOAD_REF=f'ghcr.io/example/gniri@{DIGEST}',
+                       TARGET_REF='ghcr.io/example/gniri:latest',
+                       ARTIFACT_URL='https://github.com/example/gniri/artifact/123')
+            result = subprocess.run(['/usr/bin/bash', '-eu', '-o', 'pipefail', '-c', script],
+                                    env=env, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = summary.read_text()
+            self.assertIn(f'Payload: **{env["PAYLOAD_REF"]}**', text)
+            self.assertIn(f'Installed update origin: **{env["TARGET_REF"]}**', text)
+            self.assertIn(f'[Download ISO artifact]({env["ARTIFACT_URL"]})', text)
+            self.assertIn('\n    sha256sum --check SHA256SUMS\n', text)
 
 
 class DeliveryWorkflowTests(unittest.TestCase):

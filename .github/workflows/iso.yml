@@ -54,13 +54,13 @@ jobs:
         env:
           OWNER: ${{ github.repository_owner }}
           CHANNEL: ${{ inputs.channel }}
-          DIGEST: ${{ inputs.digest }}
+          REQUESTED_DIGEST: ${{ inputs.digest }}
         run: |
           set -euo pipefail
           [[ $CHANNEL == stable || $CHANNEL == latest ]]
           image="ghcr.io/${OWNER,,}/gniri"
           target="$image:$CHANNEL"
-          digest=$DIGEST
+          digest=$REQUESTED_DIGEST
           if [[ -z $digest ]]; then
             digest=$(sudo skopeo inspect --format '{{.Digest}}' "docker://$target")
           fi
@@ -105,8 +105,8 @@ jobs:
         run: |
           {
             printf '### Installer ISO\n\n[Download ISO artifact](%s) (retained for 7 days).\n\n' "$ARTIFACT_URL"
-            printf 'Payload: `%s`\n\nInstalled update origin: `%s`\n\n' "$PAYLOAD_REF" "$TARGET_REF"
-            printf 'Extract the artifact, then run `sha256sum --check SHA256SUMS` before writing the ISO.\n\n'
+            printf 'Payload: **%s**\n\nInstalled update origin: **%s**\n\n' "$PAYLOAD_REF" "$TARGET_REF"
+            printf 'Extract the artifact, then verify its checksum before writing the ISO:\n\n    sha256sum --check SHA256SUMS\n\n'
             printf 'This run does not promote stable or certify VM, hardware, or Secure Boot readiness.\n'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload ISO build log
