@@ -1,9 +1,11 @@
 import importlib.util
 import ast
 import hashlib
+import json
 import os
 from pathlib import Path
 import shlex
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -14,9 +16,37 @@ ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('fix_anaconda', ROOT / 'installer/fix-anaconda.py')
 fixes = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixes)
+spec = importlib.util.spec_from_file_location('finalizer_smoke', ROOT / 'tests/installer-finalize-smoke.py')
+finalizer_smoke = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(finalizer_smoke)
 
 
 class InstallerSmokeContainerTests(unittest.TestCase):
+    def test_finalizer_trust_fixture_uses_checkout_not_installer_runtime(self):
+        for channel in ('stable', 'latest'):
+            with self.subTest(channel=channel), tempfile.TemporaryDirectory() as temporary:
+                tree = Path(temporary)
+                target = f'ghcr.io/example/gniri:{channel}'
+                with patch.object(finalizer_smoke.shutil, 'copyfile', wraps=shutil.copyfile) as copy:
+                    finalizer_smoke.prepare_trust(tree, target)
+                trust = tree / 'usr/share/gniri'
+                copy.assert_called_once_with(ROOT / 'trust/cosign.pub', trust / 'keys/cosign.pub')
+                self.assertEqual((trust / 'keys/cosign.pub').read_bytes(),
+                                 (ROOT / 'trust/cosign.pub').read_bytes())
+                self.assertEqual(json.loads((trust / 'bootc-policy.json').read_text()), {
+                    'default': [{'type': 'reject'}], 'transports': {'docker': {
+                        'ghcr.io/example/gniri': [{'type': 'sigstoreSigned',
+                            'keyPath': '/usr/share/gniri/keys/cosign.pub',
+                            'signedIdentity': {'type': 'matchRepository'}}]}}})
+
+    def test_missing_checkout_trust_key_fails_without_runtime_fallback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            with patch.object(finalizer_smoke, 'ROOT', base / 'missing-checkout'):
+                with self.assertRaises(FileNotFoundError):
+                    finalizer_smoke.prepare_trust(base / 'tree', 'ghcr.io/example/gniri:stable')
+            self.assertFalse((base / 'tree/usr/share/gniri/bootc-policy.json').exists())
+
     def test_mount_and_finalizer_containers_allow_mounts_without_host_access(self):
         result = subprocess.run(['make', '-n', 'check-installer'], cwd=ROOT,
                                 text=True, capture_output=True, check=True)

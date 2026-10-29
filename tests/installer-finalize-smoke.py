@@ -14,13 +14,28 @@ import shutil
 import subprocess
 import tempfile
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 def run(*args, **kwargs):
     return subprocess.run(list(map(str, args)), check=True, **kwargs)
 
 
+def prepare_trust(tree, target):
+    trust = tree / 'usr/share/gniri'
+    (trust / 'keys').mkdir(parents=True)
+    # The installer inherits Fedora, not the desktop payload's /usr. Use the
+    # read-only checkout's public key to populate this synthetic deployment.
+    shutil.copyfile(ROOT / 'trust/cosign.pub', trust / 'keys/cosign.pub')
+    (trust / 'bootc-policy.json').write_text(json.dumps({
+        'default': [{'type': 'reject'}], 'transports': {'docker': {
+            target.rsplit(':', 1)[0]: [{'type': 'sigstoreSigned',
+                'keyPath': '/usr/share/gniri/keys/cosign.pub',
+                'signedIdentity': {'type': 'matchRepository'}}]}}}))
+
+
 def check_layout(separate_boot):
-    spec = importlib.util.spec_from_file_location('finalizer', '/src/installer/finalize-target.py')
+    spec = importlib.util.spec_from_file_location('finalizer', ROOT / 'installer/finalize-target.py')
     finalizer = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(finalizer)
     with tempfile.TemporaryDirectory(prefix='gniri-finalize-', dir='/var/tmp') as temporary:
@@ -41,15 +56,8 @@ def check_layout(separate_boot):
             (tree / 'var').mkdir()
             (tree / 'usr/lib').mkdir()
             (tree / 'usr/lib/os-release').write_text('ID=fedora\nVERSION_ID=45\n')
-            trust = tree / 'usr/share/gniri'
-            (trust / 'keys').mkdir(parents=True)
-            shutil.copyfile('/usr/share/gniri/keys/cosign.pub', trust / 'keys/cosign.pub')
             target = 'ghcr.io/example/gniri:stable'
-            (trust / 'bootc-policy.json').write_text(json.dumps({
-                'default': [{'type': 'reject'}], 'transports': {'docker': {
-                    'ghcr.io/example/gniri': [{'type': 'sigstoreSigned',
-                        'keyPath': '/usr/share/gniri/keys/cosign.pub',
-                        'signedIdentity': {'type': 'matchRepository'}}]}}}))
+            prepare_trust(tree, target)
             # Real kernel/initramfs layout; the smoke test does not boot it.
             kernel = next(Path('/usr/lib/modules').glob('*/vmlinuz'))
             destination = tree / 'usr/lib/modules' / kernel.parent.name

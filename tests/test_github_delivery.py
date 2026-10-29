@@ -377,6 +377,10 @@ class DeliveryWorkflowTests(unittest.TestCase):
         self.assertLess(workflow.index('cosign verify'), workflow.index('bash scripts/build-iso.sh'))
         self.assertIn('bash scripts/build-iso.sh "$PAYLOAD_REF" "$TARGET_REF" \'\' 1', workflow)
         self.assertIn('sudo make check-installer', workflow)
+        self.assertLess(workflow.index('bash scripts/build-iso.sh'),
+                        workflow.index('sudo make check-installer'))
+        self.assertLess(workflow.index('sudo make check-installer'), workflow.index('sha256sum --check'))
+        self.assertNotIn('continue-on-error:', workflow)
         self.assertLess(workflow.index('sha256sum --check'), workflow.index('name: Upload installer ISO'))
         for filename in ('gniri-x86_64.iso', 'SHA256SUMS', 'build.json'):
             self.assertIn(f'output/iso/{filename}', workflow)

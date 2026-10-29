@@ -52,6 +52,20 @@ el perfil AppArmor predeterminado deniega `mount` incluso con `SYS_ADMIN`;
 Se conservan seccomp, el aislamiento de red y el checkout montado en solo lectura;
 no se usa `--privileged`, no se montan discos ni se modifica AppArmor del anfitrión.
 
+El [job iso 123245652586](https://github.com/efpalaciosmo/gniri/actions/runs/40812429679/job/123245652586)
+generó la ISO, pero falló al crear el fixture de confianza del finalizador: buscaba
+`/usr/share/gniri/keys/cosign.pub` en el runtime del instalador, que hereda Fedora,
+no el `/usr` del payload. El fixture copia ahora `trust/cosign.pub` del checkout
+de solo lectura a su deployment temporal, conservando la política estricta y la
+prueba real de origen firmado. No se añade la clave al runtime ni se omiten los
+checks previos a publicar el artefacto. `make check` cubre la creación del fixture
+sin depender de archivos del runtime; esto no valida por sí solo arranque o firmas.
+La reproducción local en un contenedor Fedora 44 con Anaconda 44.30-2, OSTree
+2026.4 y kernel 7.2.13 reprodujo el mismo `FileNotFoundError` antes del cambio.
+Después pasaron los cuatro layouts de montajes y ambos layouts del finalizador
+sin clave en el runtime, sin red y con el checkout de solo lectura. Se usó Docker
+para estas regresiones; no se reconstruyó una ISO ni se repitió el workflow remoto.
+
 Regresor Flatpak sin red:
 
 ```sh
