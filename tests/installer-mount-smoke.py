@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Exercise the real patched Anaconda tasks on disposable tmpfs mounts only.
 
-Run in the installer container with --network=none --cap-add SYS_ADMIN.
+Run with sudo make check-installer: --network=none --cap-add SYS_ADMIN and
+--security-opt apparmor=unconfined allow disposable mounts on Ubuntu runners.
 No disk, host filesystem mount, account database or partitioner is used.
 """
 import os

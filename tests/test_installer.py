@@ -3,6 +3,7 @@ import ast
 import hashlib
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -13,6 +14,28 @@ ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('fix_anaconda', ROOT / 'installer/fix-anaconda.py')
 fixes = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixes)
+
+
+class InstallerSmokeContainerTests(unittest.TestCase):
+    def test_mount_and_finalizer_containers_allow_mounts_without_host_access(self):
+        result = subprocess.run(['make', '-n', 'check-installer'], cwd=ROOT,
+                                text=True, capture_output=True, check=True)
+        commands = [shlex.split(line) for line in result.stdout.splitlines()
+                    if line.startswith('podman run ')]
+        self.assertEqual([command[-1] for command in commands], [
+            '/src/tests/installer-mount-smoke.py', '/src/tests/installer-finalize-smoke.py'])
+        for command in commands:
+            with self.subTest(script=command[-1]):
+                self.assertIn('--rm', command)
+                self.assertIn('--network=none', command)
+                self.assertEqual(command[command.index('--cap-add') + 1], 'SYS_ADMIN')
+                security = [command[index + 1] for index, argument in enumerate(command)
+                            if argument == '--security-opt']
+                self.assertEqual(security, ['label=disable', 'apparmor=unconfined'])
+                self.assertEqual(command[command.index('-v') + 1], f'{ROOT}:/src:ro')
+                self.assertEqual(command[command.index('--entrypoint') + 1], 'python3')
+                for forbidden in ('--privileged', '--device', '--pid=host', '--ipc=host'):
+                    self.assertNotIn(forbidden, command)
 
 
 class InstallerInitramfsTests(unittest.TestCase):

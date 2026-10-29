@@ -46,7 +46,11 @@ no marca como probados hardware, backup o transiciones que no ejecutó.
 `check-installer` ejecuta tareas reales Anaconda/OSTree sobre tmpfs: layouts de
 home/var/EFI y `/boot`, readback de argumentos, preservación de `fstab` tras fallo
 e idempotencia. No usa particionador ni discos. `label=disable` afecta solo al
-contenedor de prueba, no al modo SELinux del sistema instalado.
+contenedor de prueba, no al modo SELinux del sistema instalado. En runners Ubuntu,
+el perfil AppArmor predeterminado deniega `mount` incluso con `SYS_ADMIN`;
+`apparmor=unconfined` se aplica únicamente a esos dos contenedores desechables.
+Se conservan seccomp, el aislamiento de red y el checkout montado en solo lectura;
+no se usa `--privileged`, no se montan discos ni se modifica AppArmor del anfitrión.
 
 Regresor Flatpak sin red:
 

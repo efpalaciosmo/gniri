@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Exercise finalization against real OSTree boot entries on disposable tmpfs.
 
-Run in the installer container with --network=none --cap-add SYS_ADMIN and
-the repository mounted read-only at /src. No host disks are mounted.
+Run with sudo make check-installer: --network=none --cap-add SYS_ADMIN,
+--security-opt apparmor=unconfined and the repository read-only at /src.
+No host disks are mounted.
 """
 import importlib.util
 import gc

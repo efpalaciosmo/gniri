@@ -28,9 +28,11 @@ check-desktop: $(if $(filter 1,$(CHECKED)),,check)
 	podman build $(if $(strip $(BUILD_NETWORK)),--network="$(BUILD_NETWORK)") --build-arg "IMAGE=$(IMAGE)" -f tests/desktop.Containerfile -t localhost/gniri-desktop-test:validation .
 	podman run --rm --network=none localhost/gniri-desktop-test:validation
 
+# AppArmor's default container profile denies mounts even with SYS_ADMIN.
+# Unconfine only these offline tmpfs tests, never the host or installed image.
 check-installer:
-	podman run --rm --network=none --cap-add SYS_ADMIN --security-opt label=disable --entrypoint python3 -v "$(CURDIR):/src:ro" localhost/gniri-installer:latest /src/tests/installer-mount-smoke.py
-	podman run --rm --network=none --cap-add SYS_ADMIN --security-opt label=disable --entrypoint python3 -v "$(CURDIR):/src:ro" localhost/gniri-installer:latest /src/tests/installer-finalize-smoke.py
+	podman run --rm --network=none --cap-add SYS_ADMIN --security-opt label=disable --security-opt apparmor=unconfined --entrypoint python3 -v "$(CURDIR):/src:ro" localhost/gniri-installer:latest /src/tests/installer-mount-smoke.py
+	podman run --rm --network=none --cap-add SYS_ADMIN --security-opt label=disable --security-opt apparmor=unconfined --entrypoint python3 -v "$(CURDIR):/src:ro" localhost/gniri-installer:latest /src/tests/installer-finalize-smoke.py
 
 build: check
 	python3 scripts/build-image.py "$(IMAGE)" --reference "$(IMAGE)" --source "$(SOURCE_URL)" --revision "$(SOURCE_REVISION)" --network "$(BUILD_NETWORK)" $(if $(filter 1,$(REFRESH)),--fresh)
