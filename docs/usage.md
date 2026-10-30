@@ -44,7 +44,9 @@ y restaura su línea de inicio en tus dotfiles.
 ## Aplicaciones
 
 Flathub se registra como usuario en segundo plano, con descriptor/clave incluidos
-y verificados; no instala aplicaciones. Una advertencia de metadatos sin red es
+y verificados; también se reimportan las claves del remoto oficial existente sin
+borrar aplicaciones ni cambiar sus preferencias. No instala aplicaciones ni
+modifica un remoto `flathub` con URL personalizada. Una advertencia de metadatos sin red es
 esperable. El remoto de sistema debe estar vacío en una instalación nueva.
 El repositorio de sistema se inicializa al arrancar, sin añadir remotos ni apps;
 así los comandos que consultan ambas instalaciones no encuentran un OSTree vacío.
@@ -69,6 +71,45 @@ concede acceso polkit a máquinas virtuales. Puedes instalar aplicaciones de
 virtualización mediante Flatpak; un cliente que dependa de libvirt en el host
 no obtiene ese backend automáticamente. Los discos y datos existentes bajo
 `/var` no se borran al actualizar.
+
+### Flathub: `Can't check signature: public key not found`
+
+Si `flathub` ya existe, `remote-add --if-not-exists` no repara sus claves.
+El fallo de firma impide consultar el catálogo y puede producir después
+`No remote refs found`, búsquedas vacías o errores de AppStream. No desactives
+la verificación GPG ni borres el remoto o sus aplicaciones.
+
+En una imagen que incluya la reparación, ejecuta como usuario normal:
+
+```sh
+gniri-flathub-user
+flatpak remote-ls --user flathub --app --columns=application
+flatpak update --user --appstream flathub
+flatpak install --user flathub com.brave.Browser
+```
+
+También puedes reiniciar `gniri-flathub-user.service` y consultar su journal.
+En imágenes anteriores que ya incluyan el descriptor verificado, comprueba con
+`flatpak remotes --user --columns=name,url` que `flathub` apunta a
+`https://dl.flathub.org/repo/` o `https://flathub.org/repo/`, y reimporta sus claves
+sin descargar claves de otra fuente:
+
+```sh
+python3 - <<'PY' | flatpak remote-modify --user --gpg-verify --gpg-import=- flathub
+import base64
+import configparser
+import sys
+config = configparser.ConfigParser(interpolation=None)
+with open('/usr/share/gniri/flathub.flatpakrepo') as stream:
+    config.read_file(stream)
+sys.stdout.buffer.write(base64.b64decode(config['Flatpak Repo']['GPGKey'], validate=True))
+PY
+```
+
+Repite las consultas anteriores con red disponible. La reparación solo añade
+confianza desde el descriptor incluido; no modifica SELinux, firewall ni apps.
+Volver al deployment anterior no revierte las claves del hogar del usuario;
+no las elimines como limpieza ni reinstales el sistema por este error.
 
 ### Error Flatpak `opendir(objects): No such file or directory`
 

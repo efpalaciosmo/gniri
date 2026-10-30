@@ -85,7 +85,11 @@ podman run --rm --network=none --entrypoint bash \
 El regresor reproduce `opendir(objects)` con un `repo/` vacío tras tmpfiles,
 ejecuta el inicializador de arranque y comprueba que repetirlo conserve remotos,
 configuración y claves. Consulta Flatpak como usuario normal tanto con `--user`
-como sin selector. No descarga ni instala aplicaciones.
+como sin selector. Elimina solo el keyring del remoto de prueba para reproducir
+la pérdida de claves: `remote-add --if-not-exists` no lo restaura y el helper de
+sesión sí, incluso al repetirse. Comprueba también que conserve la prioridad y
+el estado deshabilitado del remoto y que no modifique un remoto con URL
+personalizada. No descarga ni instala aplicaciones.
 
 CI prueba además el precheck real de políticas offline y el cliente
 containers/image contra manifests firmados, sin firma y de clave incorrecta.

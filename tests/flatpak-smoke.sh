@@ -34,14 +34,36 @@ as_user() {
     runuser -u gniri-flatpak-test -- env HOME="$home" XDG_DATA_HOME="$home/.local/share" "$@"
 }
 for _ in 1 2; do
-    as_user flatpak remote-add --user --if-not-exists flathub /usr/share/gniri/flathub.flatpakrepo
+    as_user gniri-flathub-user
 done
 [[ $(as_user flatpak remotes --user --columns=name) == flathub ]]
 [[ $(as_user flatpak remotes --user --columns=url) == https://dl.flathub.org/repo/ ]]
 [[ $(as_user ostree --repo="$home/.local/share/flatpak/repo" config get 'remote "flathub".gpg-verify') == true ]]
 [[ -s $home/.local/share/flatpak/repo/flathub.trustedkeys.gpg ]]
+# Reproduce an existing remote whose signing keys were lost. Merely adding it
+# again succeeds without restoring trust; the session helper must repair it.
+keyring=$home/.local/share/flatpak/repo/flathub.trustedkeys.gpg
+cp "$keyring" "$home/expected-keys.gpg"
+rm "$keyring"
+as_user flatpak remote-add --user --if-not-exists flathub /usr/share/gniri/flathub.flatpakrepo
+[[ ! -e $keyring ]]
+for _ in 1 2; do
+    as_user gniri-flathub-user
+    cmp "$home/expected-keys.gpg" "$keyring"
+done
+# Refreshing trust must not reset user settings or enable a disabled remote.
+as_user flatpak remote-modify --user --disable --prio=7 flathub
+as_user gniri-flathub-user
+[[ $(as_user ostree --repo="$home/.local/share/flatpak/repo" config get 'remote "flathub".xa.disable') == true ]]
+[[ $(as_user ostree --repo="$home/.local/share/flatpak/repo" config get 'remote "flathub".xa.prio') == 7 ]]
+as_user flatpak remote-modify --user --enable flathub
+# A user-owned remote with the same name but a custom URL is not ours to repair.
+as_user flatpak remote-modify --user --url=file:///srv/custom-flatpak flathub
+before=$(sha256sum "$home/.local/share/flatpak/repo/config" "$keyring")
+as_user gniri-flathub-user
+[[ $(sha256sum "$home/.local/share/flatpak/repo/config" "$keyring") == "$before" ]]
 [[ -z $(as_user flatpak list --user --columns=application) ]]
 [[ -z $(as_user flatpak remotes --system --columns=name) ]]
 [[ -z $(as_user flatpak list --system --columns=application) ]]
 [[ -z $(as_user flatpak list --columns=application) ]]
-printf 'Offline system repository initialization, user Flathub, GPG verification and idempotence passed.\n'
+printf 'Offline system repository initialization, user Flathub, signing-key repair and idempotence passed.\n'

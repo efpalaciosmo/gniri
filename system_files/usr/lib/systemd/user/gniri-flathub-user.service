@@ -1,5 +1,5 @@
 [Unit]
-Description=Add Flathub for this user only (no apps are installed)
+Description=Configure user Flathub and refresh its signing keys (no apps are installed)
 # Do not make the target wait for this network operation. Explicit ordering
 # starts it only after the desktop target is active, even when offline.
 DefaultDependencies=no
@@ -9,7 +9,7 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/flatpak remote-add --user --if-not-exists flathub /usr/share/gniri/flathub.flatpakrepo
+ExecStart=/usr/bin/gniri-flathub-user
 RemainAfterExit=yes
 Restart=on-failure
 RestartSec=1min

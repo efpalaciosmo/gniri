@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Register user Flathub and repair its keys from the verified image descriptor."""
+import base64
+import configparser
+from pathlib import Path
+import subprocess
+import sys
+
+DESCRIPTOR = Path('/usr/share/gniri/flathub.flatpakrepo')
+FLATHUB_URLS = {'https://dl.flathub.org/repo', 'https://flathub.org/repo'}
+
+
+def configure_flathub(descriptor=DESCRIPTOR):
+    config = configparser.ConfigParser(interpolation=None)
+    config.read_string(descriptor.read_text())
+    repo = config['Flatpak Repo']
+    if repo['Url'].rstrip('/') not in FLATHUB_URLS:
+        raise ValueError('The bundled descriptor must point to official Flathub')
+    key = base64.b64decode(repo['GPGKey'], validate=True)
+    if not key:
+        raise ValueError('The bundled Flathub signing key is empty')
+
+    subprocess.run(['flatpak', 'remote-add', '--user', '--if-not-exists',
+                    'flathub', str(descriptor)], check=True)
+    remotes = subprocess.check_output(
+        ['flatpak', 'remotes', '--user', '--show-disabled', '--columns=name,url'],
+        text=True)
+    for line in remotes.splitlines():
+        name, url = line.split('\t', 1)
+        if name == 'flathub':
+            if url.rstrip('/') not in FLATHUB_URLS:
+                print('Leaving custom user remote flathub unchanged: ' + url,
+                      file=sys.stderr)
+                return
+            # remote-add --if-not-exists does not repair existing keyrings.
+            # Import, do not replace: keep installed apps and other trusted keys.
+            subprocess.run(['flatpak', 'remote-modify', '--user', '--gpg-verify',
+                            '--gpg-import=-', 'flathub'], input=key, check=True)
+            return
+    raise RuntimeError('User Flathub remote was not registered')
+
+
+if __name__ == '__main__':
+    configure_flathub()

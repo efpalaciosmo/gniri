@@ -64,11 +64,12 @@ class DesktopTests(unittest.TestCase):
 
     def test_flathub_remains_user_only_and_asynchronous(self):
         text = (OVERLAY / 'usr/lib/systemd/user/gniri-flathub-user.service').read_text()
-        self.assertIn('remote-add --user --if-not-exists flathub', text)
+        self.assertIn('ExecStart=/usr/bin/gniri-flathub-user', text)
         self.assertNotIn('flatpak install', text)
         self.assertIn('DefaultDependencies=no', text)
         self.assertIn('After=graphical-session.target', text)
-        self.assertIn('/usr/share/gniri/flathub.flatpakrepo', text)
+        helper = (OVERLAY / 'usr/bin/gniri-flathub-user').read_text()
+        self.assertIn('/usr/share/gniri/flathub.flatpakrepo', helper)
         self.assertNotIn('https://flathub.org/repo/flathub.flatpakrepo', text)
         presets = (OVERLAY / 'usr/lib/systemd/user-preset/00-gniri.preset').read_text()
         self.assertIn('enable gniri-flathub-user.service', presets)

@@ -49,6 +49,7 @@ done
 [[ -z $(flatpak list --system --columns=application) ]]
 [[ $(readlink /etc/systemd/system/flatpak-add-fedora-repos.service) == /dev/null ]]
 [[ -s /usr/share/gniri/flathub.flatpakrepo ]]
+[[ -x /usr/bin/gniri-flathub-user ]]
 rpm -q polkit-kde kf6-kirigami kf6-qqc2-desktop-style qt6-qtbase-gui
 [[ -x /usr/libexec/kf6/polkit-kde-authentication-agent-1 ]]
 [[ -s /usr/lib64/qt6/plugins/platforms/libqwayland.so ]]
