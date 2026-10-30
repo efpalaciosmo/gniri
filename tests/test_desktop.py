@@ -36,9 +36,25 @@ class DesktopTests(unittest.TestCase):
         text = NIRI.read_text()
         self.assertIn('spawn-at-startup "waybar"', text)
         self.assertIn('spawn-at-startup "mako"', text)
-        self.assertIn('spawn-at-startup "/usr/bin/lxpolkit"', text)
         for app in ('waybar', 'mako', 'ghostty', 'fuzzel', 'swaylock', 'zathura'):
             self.assertFalse((OVERLAY / 'etc/xdg' / app).exists())
+
+    def test_modern_polkit_agent_and_runtime_dependencies(self):
+        agent = '/usr/libexec/kf6/polkit-kde-authentication-agent-1'
+        config = NIRI.read_text()
+        self.assertIn(f'spawn-at-startup "{agent}"', config)
+        self.assertNotIn('lxpolkit', config)
+        packages = (ROOT / 'packages/niri.txt').read_text().splitlines()
+        self.assertNotIn('lxpolkit', packages)
+        validation = (ROOT / 'build/validate-image.sh').read_text()
+        for package in ('polkit-kde', 'kf6-kirigami', 'kf6-qqc2-desktop-style',
+                        'qt6-qtbase-gui'):
+            self.assertIn(package, packages)
+            self.assertIn(package, validation)
+        self.assertIn(f'[[ -x {agent} ]]', validation)
+        self.assertIn('[[ -s /usr/lib64/qt6/plugins/platforms/libqwayland.so ]]', validation)
+        for module in ('org/kde/kirigami', 'org/kde/desktop'):
+            self.assertIn(f'[[ -s /usr/lib64/qt6/qml/{module}/qmldir ]]', validation)
 
     def test_screen_lock_is_not_removed_with_the_dotfiles(self):
         text = NIRI.read_text()

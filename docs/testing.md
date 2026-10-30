@@ -31,6 +31,14 @@ si está disponible: cubren administradores locales activos y rechazos por
 grupo, sesión o acción ajena. No sustituyen una comprobación de polkit/logind
 en un escritorio arrancado.
 
+En Niri, comprueba además que el agente Qt 6 de `polkit-kde` muestre el diálogo
+al abrir virt-manager con `qemu:///system`, desde una cuenta sin autorización
+libvirt sin contraseña. Prueba autenticación correcta, contraseña incorrecta y
+cancelación; repite con configuración personal y tras cerrar/abrir sesión.
+No deben aparecer errores de módulos QML ni dos agentes simultáneos. En GNOME,
+debe seguir usándose el agente integrado de GNOME Shell. La presencia del
+ejecutable y los módulos en la imagen no valida estos flujos interactivos.
+
 El gate de migración debe partir también de una instalación Atomic existente:
 registrar cuenta/UID/grupos/shell antes del rebase y comprobarlos después, junto
 con acceso al hogar, GDM, ambas sesiones y apertura del terminal como usuario

@@ -6,7 +6,8 @@ GDM ofrece GNOME y Niri y recuerda la selección de cada usuario. Niri usa
 [`/etc/niri/config.kdl`](../system_files/etc/niri/config.kdl) solo si no existe
 `$XDG_CONFIG_HOME/niri/config.kdl` o `~/.config/niri/config.kdl`. El respaldo está
 en inglés: `Super+Enter` abre Ghostty; `Super+D`, Fuzzel; `Super+Alt+L`, swaylock.
-Incluye Waybar/Mako, agente polkit y bloqueo a los cinco minutos/antes de suspender.
+Incluye Waybar/Mako, el agente polkit de KDE (Qt 6) y bloqueo a los cinco
+minutos/antes de suspender. GNOME usa su agente integrado en GNOME Shell.
 
 No se copian dotfiles, temas ni scripts personales al entrar; tampoco se cambia
 el shell ni se configura Starship automáticamente. Para partir del respaldo:
@@ -19,6 +20,26 @@ cp --no-clobber /etc/niri/config.kdl ~/.config/niri/config.kdl
 Puedes usar enlaces Stow revisados, no un playbook de instalación de otra distro.
 Tu configuración reemplaza el respaldo completo: debe definir también procesos
 de inicio y bloqueo. Los archivos personales de versiones antiguas no se borran.
+
+### Agente de autenticación en Niri
+
+Para recibir solicitudes gráficas de contraseña (por ejemplo, en virt-manager),
+tu configuración personal debe iniciar un único agente. Sustituye la línea de
+lxpolkit o el bucle que busca el retirado polkit-gnome por:
+
+```kdl
+spawn-at-startup "/usr/libexec/kf6/polkit-kde-authentication-agent-1"
+```
+
+Si usas `autostart.kdl`, comprueba que tu configuración principal lo incluya.
+La imagen debe contener `polkit-kde`; cambiar el checkout no instala paquetes
+en un sistema bootc existente. Tras arrancar una imagen que incluya el cambio,
+cierra la sesión por completo y vuelve a entrar para no ejecutar dos agentes.
+Comprueba `virsh -c qemu:///system list --all` como usuario normal: si la política
+requiere autenticación, debe aparecer el diálogo. No hace falta desactivar
+SELinux, cambiar el firewall ni conceder administración sin contraseña.
+Para volver temporalmente al agente anterior, arranca el deployment anterior
+y restaura su línea de inicio en tus dotfiles.
 
 ## Aplicaciones y virtualización
 

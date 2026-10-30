@@ -2,11 +2,16 @@ brightnessctl
 fuzzel
 ghostty
 libnotify
-lxpolkit
+# Modern Qt 6 authentication dialog; QML/Wayland dependencies are explicit
+# because image builds disable weak dependencies.
+kf6-kirigami
+kf6-qqc2-desktop-style
 mako
 network-manager-applet
 niri
 playerctl
+polkit-kde
+qt6-qtbase-gui
 swaybg
 swayidle
 swaylock
