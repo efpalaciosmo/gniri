@@ -98,6 +98,23 @@ class DesktopTests(unittest.TestCase):
         self.assertIn('"$FLATHUB_REPO_SHA256"', script)
         self.assertIn('/usr/share/gniri/flathub.flatpakrepo', script)
 
+    def test_system_flatpak_repo_is_initialized_after_tmpfiles_before_login(self):
+        self.assertIn('ostree', (ROOT / 'packages/core.txt').read_text().splitlines())
+        unit = (OVERLAY / 'usr/lib/systemd/system/gniri-flatpak-system-repo.service').read_text()
+        self.assertIn('After=systemd-tmpfiles-setup.service', unit)
+        self.assertIn('Before=gdm.service flatpak-system-helper.service', unit)
+        self.assertIn('RequiresMountsFor=/var/lib/flatpak', unit)
+        self.assertIn('StateDirectory=flatpak', unit)
+        self.assertIn('ExecStart=/usr/bin/ostree --repo=/var/lib/flatpak/repo init --mode=bare-user-only', unit)
+        self.assertNotIn('remote-add', unit)
+        self.assertNotIn('rm ', unit)
+        preset = (OVERLAY / 'usr/lib/systemd/system-preset/00-gniri.preset').read_text()
+        self.assertIn('enable gniri-flatpak-system-repo.service', preset)
+        smoke = (ROOT / 'tests/flatpak-smoke.sh').read_text()
+        self.assertIn('systemd-tmpfiles --create --prefix=/var/lib/flatpak', smoke)
+        self.assertIn('opendir(objects)', smoke)
+        self.assertIn('as_user flatpak list --columns=application', smoke)
+
     def test_fedora_backgrounds_and_session_helper_are_explicit(self):
         packages = (ROOT / 'packages/desktop.txt').read_text().splitlines()
         for package in ('gnome-backgrounds', 'dbus-tools'):

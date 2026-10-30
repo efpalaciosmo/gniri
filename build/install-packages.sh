@@ -22,18 +22,12 @@ EOF
 "${dnf[@]}" --refresh upgrade
 "${dnf[@]}" install "${packages[@]}"
 
-# Fedora's base can include the umbrella binfmt package and emulators for every
-# CPU. Retain ARM/AArch64 containers; remove only the other installed emulators.
-# Do not autoremove unrelated packages inherited from the official base.
-unused_emulators=()
-while IFS= read -r package; do
-    case "$package" in
-        qemu-user-static-aarch64|qemu-user-static-arm) ;;
-        qemu-user-static|qemu-user-static-*) unused_emulators+=("$package") ;;
-    esac
-done < <(rpm -qa --qf '%{NAME}\n' 'qemu-user-static*')
-if ((${#unused_emulators[@]})); then
-    "${dnf[@]}" --setopt=clean_requirements_on_remove=False remove "${unused_emulators[@]}"
+# Do not inherit a host virtualization stack (including foreign-CPU binfmt).
+# Leave unrelated dependencies alone instead of running a general autoremove.
+mapfile -t virtualization_packages < <(rpm -qa --qf '%{NAME}\n' \
+    'qemu*' 'libvirt*' 'virt-manager' 'virt-install' 'virt-viewer' 'swtpm*' 'edk2-*')
+if ((${#virtualization_packages[@]})); then
+    "${dnf[@]}" --setopt=clean_requirements_on_remove=False remove "${virtualization_packages[@]}"
 fi
 
 # Tailscale uses its official stable repository, restricted to its own RPM.

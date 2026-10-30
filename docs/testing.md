@@ -32,8 +32,8 @@ grupo, sesión o acción ajena. No sustituyen una comprobación de polkit/logind
 en un escritorio arrancado.
 
 En Niri, comprueba además que el agente Qt 6 de `polkit-kde` muestre el diálogo
-al abrir virt-manager con `qemu:///system`, desde una cuenta sin autorización
-libvirt sin contraseña. Prueba autenticación correcta, contraseña incorrecta y
+al ejecutar `pkexec /usr/bin/true` como usuario normal.
+Prueba autenticación correcta, contraseña incorrecta y
 cancelación; repite con configuración personal y tras cerrar/abrir sesión.
 No deben aparecer errores de módulos QML ni dos agentes simultáneos. En GNOME,
 debe seguir usándose el agente integrado de GNOME Shell. La presencia del
@@ -81,6 +81,11 @@ podman run --rm --network=none --entrypoint bash \
   -v "$PWD/tests/flatpak-smoke.sh:/run/flatpak-smoke.sh:ro" \
   localhost/gniri:development /run/flatpak-smoke.sh
 ```
+
+El regresor reproduce `opendir(objects)` con un `repo/` vacío tras tmpfiles,
+ejecuta el inicializador de arranque y comprueba que repetirlo conserve remotos,
+configuración y claves. Consulta Flatpak como usuario normal tanto con `--user`
+como sin selector. No descarga ni instala aplicaciones.
 
 CI prueba además el precheck real de políticas offline y el cliente
 containers/image contra manifests firmados, sin firma y de clave incorrecta.
@@ -157,7 +162,8 @@ Esta lista es un inventario, no resultados ya obtenidos:
 - [ ] **Ambos escritorios:** login GDM y selección recordada, Ghostty, fondos Fedora,
   portales Flatpak (archivos/pantalla/clipboard), polkit, keyring, red, audio y
   Bluetooth. Login offline, Flathub solo de usuario, sin apps preinstaladas;
-  prioridad de dotfiles/Stow y preservación tras actualización.
+  repositorio de sistema válido antes de GDM (también tras rebase desde un
+  esqueleto incompleto); prioridad de dotfiles/Stow y preservación tras actualización.
 - [ ] **Bloqueo/hardware:** idle y bloqueo antes de suspensión, sin flash desbloqueado
   al reanudar. AMD/Intel real: OpenGL/Vulkan/VA-API/OpenCL, monitores y suspensión;
   Wi-Fi/Bluetooth/reconexión, USB/audio/micrófono, cámara, Wacom (presión/mapeo/botones)
@@ -167,13 +173,12 @@ Esta lista es un inventario, no resultados ya obtenidos:
   ignora una política insegura del entorno, respeta origen/pausa/rollback y deja
   funcionar Podman/Distrobox. El timer y catch-up preparan sin reiniciar; fallos
   registran estado/reintentos limitados. Reboot manual entra en el nuevo deployment.
-- [ ] **Recuperación:** rollback restaura el sistema y preserva hogares, libvirt y
+- [ ] **Recuperación:** rollback restaura el sistema y preserva hogares, datos de aplicaciones y
   Tailscale; no se vuelve a preparar el digest defectuoso. Ensaya interrupción,
   disco lleno y restauración de backup solo en discos desechables.
-- [ ] **Virtualización/red:** cuenta autorizada es la única con acceso sin contraseña;
-  KVM x86 con NAT/UEFI/TPM/virtio 3D y ARM32/64 con TCG/firmware. DHCP/DNS/HTTPS
-  funcionan en libvirt NAT, no solo en red QEMU de usuario. Puentes deliberados
-  sin perder red; SELinux Enforcing y firewalld activos.
+- [ ] **Aplicaciones/red:** no hay paquetes ni sockets QEMU/libvirt/virt-manager
+  incluidos por Gniri. Comprueba DHCP/DNS/HTTPS con SELinux Enforcing y firewalld
+  activos; prueba por separado cualquier aplicación de virtualización Flatpak.
 
 Registra dentro de la VM `mokutil --sb-state`, `getenforce`, `systemctl --failed`,
 `bootc status`, `findmnt` y journals pertinentes. No desactives protecciones para

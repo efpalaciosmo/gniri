@@ -1,4 +1,4 @@
-# x86_64 host image; ARM machines are guests, not an additional host variant.
+# x86_64 desktop image.
 ARG BASE_IMAGE=quay.io/fedora/fedora-bootc:latest@sha256:1543ba2788ee2055e0d44a8d879c79a2f527326600eca95a5f673414a48ff73c
 FROM ${BASE_IMAGE}
 

@@ -1,0 +1,16 @@
+[Unit]
+Description=Initialize the empty Flatpak system repository without adding remotes
+RequiresMountsFor=/var/lib/flatpak
+After=systemd-tmpfiles-setup.service
+Before=gdm.service flatpak-system-helper.service
+
+[Service]
+Type=oneshot
+StateDirectory=flatpak
+# tmpfiles may create repo/ without OSTree's required objects/ and config.
+# init completes that skeleton and preserves existing config, refs and remotes.
+ExecStart=/usr/bin/ostree --repo=/var/lib/flatpak/repo init --mode=bare-user-only
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -72,7 +72,6 @@ for library in ('libEGL.so.1', 'libGLESv2.so.2', 'libGL.so.1', 'libgbm.so.1'):
 PY
 ghostty +version
 ghostty +validate-config --config-file=/dev/null
-[[ -f /usr/share/libvirt/networks/default.xml || -f /etc/libvirt/qemu/networks/default.xml ]]
 fc-match 'JetBrainsMono Nerd Font' --format '%{family}\n' | grep -F 'JetBrainsMono Nerd Font'
 [[ -s /usr/share/licenses/gniri-nerd-fonts/OFL.txt ]]
 niri validate --config /etc/niri/config.kdl
@@ -80,17 +79,16 @@ niri validate --config /etc/niri/config.kdl
 for command in distrobox fastfetch vi vim traceroute ghostty niri-session dbus-update-activation-environment fuzzel mako waybar swayidle swaylock nautilus wpctl playerctl; do
     command -v "$command"
 done
-for module in uinput wacom kvm_amd amdgpu; do
+for module in uinput wacom amdgpu; do
     found=false
     for kernel in /usr/lib/modules/*; do
         if modinfo -k "${kernel##*/}" "$module" >/dev/null 2>&1; then found=true; fi
     done
     "$found" || { printf 'Missing module: %s\n' "$module" >&2; exit 1; }
 done
-systemctl is-enabled gdm.service bootc-fetch-apply-updates.timer virtqemud.socket
-systemctl is-enabled virtlockd.socket virtlogd.socket
+systemctl is-enabled gdm.service bootc-fetch-apply-updates.timer gniri-flatpak-system-repo.service
+systemd-analyze --man=no verify /usr/lib/systemd/system/gniri-flatpak-system-repo.service
 systemctl --global is-enabled gniri-flathub-user.service
-getent group libvirt
 install -d -m 0700 /run/gniri-build/verify-runtime
 XDG_RUNTIME_DIR=/run/gniri-build/verify-runtime systemd-analyze --user --man=no verify \
     /usr/lib/systemd/user/gniri-flathub-user.service \

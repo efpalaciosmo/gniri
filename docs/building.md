@@ -30,10 +30,9 @@ verificación de firmas RPM. [Las descargas upstream](../build/upstream.env) tie
 fijos. Los RPM siguen repositorios vivos: no hay reproducibilidad bit a bit.
 
 Las transacciones omiten documentación RPM (`tsflags=nodocs`), conservando licencias.
-QEMU usa emuladores `-core` y módulos explícitos para KVM x86_64, ARM, SPICE,
-OpenGL, audio PipeWire y USB. No instala los metapaquetes que exigen todos los
-backends de almacenamiento y todas las interfaces. Del binfmt heredado conserva
-ARM/AArch64 para contenedores; elimina emuladores de las otras arquitecturas.
+No se incluye la pila de virtualización del host: QEMU, libvirt, virt-manager,
+firmware de invitados ni TPM virtual. También se retiran emuladores QEMU/binfmt
+heredados de la base; Podman/Distrobox siguen disponibles para la arquitectura nativa.
 Se conservan firmware, microcódigo y traducciones del escritorio.
 
 ## Construcción local

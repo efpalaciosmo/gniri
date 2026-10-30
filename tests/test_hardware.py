@@ -25,6 +25,25 @@ class HardwarePackageTests(unittest.TestCase):
         self.assertFalse((overlay / 'etc/pam.d').exists())
         self.assertFalse((overlay / 'etc/authselect').exists())
 
+    def test_host_virtualization_stack_is_not_bundled(self):
+        for path in (ROOT / 'packages').glob('*.txt'):
+            packages = [line.split('#')[0].strip() for line in path.read_text().splitlines()]
+            for package in packages:
+                self.assertFalse(package.startswith(('qemu', 'libvirt', 'swtpm', 'edk2-')),
+                                 f'{path}: {package}')
+                self.assertNotIn(package, ('virt-manager', 'virt-install', 'virt-viewer', 'virglrenderer'))
+        overlay = ROOT / 'system_files'
+        self.assertFalse((overlay / 'usr/bin/gniri-setup-virtualization').exists())
+        self.assertFalse((overlay / 'etc/polkit-1/rules.d/00-gniri-libvirt.rules').exists())
+        self.assertNotIn('virt-manager.desktop', (ROOT / 'packages/visible-applications.allow').read_text())
+        preset = (overlay / 'usr/lib/systemd/system-preset/00-gniri.preset').read_text()
+        self.assertNotIn('virt', preset)
+        installation = (ROOT / 'build/install-packages.sh').read_text()
+        validation = (ROOT / 'build/validate-hardware.py').read_text()
+        for pattern in ("'qemu*'", "'libvirt*'", "'virt-manager'", "'swtpm*'", "'edk2-*'"):
+            self.assertIn(pattern, installation)
+            self.assertIn(pattern, validation)
+
     def test_build_uses_stock_modules_without_signing_secrets(self):
         text = (ROOT / 'Containerfile').read_text()
         self.assertEqual(sum(line.startswith('FROM ') for line in text.splitlines()), 1)

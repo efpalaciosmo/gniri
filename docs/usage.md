@@ -23,7 +23,7 @@ de inicio y bloqueo. Los archivos personales de versiones antiguas no se borran.
 
 ### Agente de autenticación en Niri
 
-Para recibir solicitudes gráficas de contraseña (por ejemplo, en virt-manager),
+Para recibir solicitudes gráficas de contraseña (por ejemplo, al administrar servicios),
 tu configuración personal debe iniciar un único agente. Sustituye la línea de
 lxpolkit o el bucle que busca el retirado polkit-gnome por:
 
@@ -35,22 +35,26 @@ Si usas `autostart.kdl`, comprueba que tu configuración principal lo incluya.
 La imagen debe contener `polkit-kde`; cambiar el checkout no instala paquetes
 en un sistema bootc existente. Tras arrancar una imagen que incluya el cambio,
 cierra la sesión por completo y vuelve a entrar para no ejecutar dos agentes.
-Comprueba `virsh -c qemu:///system list --all` como usuario normal: si la política
+Comprueba `pkexec /usr/bin/true` como usuario normal: si la política
 requiere autenticación, debe aparecer el diálogo. No hace falta desactivar
 SELinux, cambiar el firewall ni conceder administración sin contraseña.
 Para volver temporalmente al agente anterior, arranca el deployment anterior
 y restaura su línea de inicio en tus dotfiles.
 
-## Aplicaciones y virtualización
+## Aplicaciones
 
 Flathub se registra como usuario en segundo plano, con descriptor/clave incluidos
 y verificados; no instala aplicaciones. Una advertencia de metadatos sin red es
 esperable. El remoto de sistema debe estar vacío en una instalación nueva.
+El repositorio de sistema se inicializa al arrancar, sin añadir remotos ni apps;
+así los comandos que consultan ambas instalaciones no encuentran un OSTree vacío.
 
 ```sh
 flatpak remotes --user
 flatpak remotes --system
 flatpak install --user flathub ID_DE_LA_APLICACION
+# Por ejemplo:
+flatpak install --user flathub com.brave.Browser
 sudo tailscale up
 ```
 
@@ -60,17 +64,32 @@ comprueba primero `flatpak list --system --columns=application,origin`; solo si
 no se usa, retíralo con `sudo flatpak remote-delete --system fedora`, sin `--force`.
 Podman/Distrobox no crean ni descargan contenedores hasta solicitarlos.
 
+La imagen no incluye QEMU, libvirt ni virt-manager, no habilita sus sockets ni
+concede acceso polkit a máquinas virtuales. Puedes instalar aplicaciones de
+virtualización mediante Flatpak; un cliente que dependa de libvirt en el host
+no obtiene ese backend automáticamente. Los discos y datos existentes bajo
+`/var` no se borran al actualizar.
+
+### Error Flatpak `opendir(objects): No such file or directory`
+
+Indica un directorio `/var/lib/flatpak/repo` incompleto. En un sistema antiguo,
+cierra GNOME Software y cualquier operación Flatpak antes de ejecutar:
+
 ```sh
-sudo gniri-setup-virtualization "$USER"
-# Cierra la sesión por completo y vuelve a entrar.
-virsh -c qemu:///system list --all
+sudo ostree --repo=/var/lib/flatpak/repo init --mode=bare-user-only
+flatpak remotes --system
+flatpak list --system
+flatpak install --user flathub com.brave.Browser
 ```
 
-Esto concede **administración elevada del anfitrión** a una cuenta local mediante
-libvirt/polkit y activa NAT. Seleccionar otra cuenta sustituye la autorización
-sin contraseña anterior. Para 3D: Virtio con aceleración y SPICE/OpenGL local.
-ARM32/64 usa TCG; x86 usa KVM. Los puentes se crean deliberadamente; una interfaz
-Wi-Fi en modo estación normalmente no admite un puente Ethernet convencional.
+`ostree init` completa el esqueleto sin borrar configuración, remotos, claves
+ni aplicaciones existentes. No elimines `/var/lib/flatpak` para repararlo.
+En imágenes nuevas revisa también:
+
+```sh
+systemctl status gniri-flatpak-system-repo.service
+journalctl -b -u gniri-flatpak-system-repo.service
+```
 
 ## Hardware y diagnóstico
 

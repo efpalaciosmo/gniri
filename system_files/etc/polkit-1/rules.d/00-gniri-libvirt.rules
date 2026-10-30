@@ -1,6 +1,0 @@
-// No account has passwordless system libvirt access until explicitly selected
-// with gniri-setup-virtualization. This precedes Fedora's libvirt-group rule.
-polkit.addRule(function(action, subject) {
-    if (action.id == "org.libvirt.unix.manage")
-        return polkit.Result.AUTH_ADMIN;
-});

@@ -9,6 +9,7 @@ git
 glibc-langpack-en
 make
 nss-altfiles
+ostree
 podman
 python3
 rpm-ostree

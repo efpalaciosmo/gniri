@@ -27,8 +27,9 @@ for root, dirs, files in os.walk('/var', followlinks=False):
             raise SystemExit(f'Unreviewed persistent file in image: {path}')
         path.unlink()
 
-# An incomplete OSTree repo is not a useful default. Flatpak initializes this
-# mutable system store itself if the administrator ever chooses to use it.
+# Do not turn a build-time repository into an empty tmpfiles skeleton. The
+# runtime initializer creates a valid mutable store after package tmpfiles run;
+# Flatpak itself cannot open a repo/ directory without objects/ and config.
 flatpak_repo = Path('/var/lib/flatpak/repo')
 if flatpak_repo.exists():
     shutil.rmtree(flatpak_repo)
