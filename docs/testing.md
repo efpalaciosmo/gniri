@@ -176,9 +176,17 @@ Esta lista es un inventario, no resultados ya obtenidos:
 - [ ] **Recuperación:** rollback restaura el sistema y preserva hogares, datos de aplicaciones y
   Tailscale; no se vuelve a preparar el digest defectuoso. Ensaya interrupción,
   disco lleno y restauración de backup solo en discos desechables.
-- [ ] **Aplicaciones/red:** no hay paquetes ni sockets QEMU/libvirt/virt-manager
+- [ ] **Invitado VM:** con vídeo Virtio/SPICE y canales `com.redhat.spice.0` y
+  `org.qemu.guest_agent.0`, comprueba agentes, resize real de resolución al agrandar/
+  reducir el visor y fullscreen en GNOME y Niri; repite tras logout/login y reboot,
+  también con dotfiles personales sin modo fijo. Registra resoluciones y journals;
+  escalar la imagen del visor no cuenta como resize. En hardware físico o sin
+  canales los agentes no deben provocar servicios fallidos. Los checks de imagen
+  verifican dependencias, no estas interacciones con el anfitrión.
+- [ ] **Aplicaciones/red:** no hay paquetes ni sockets del hipervisor QEMU/libvirt/virt-manager
   incluidos por Gniri. Comprueba DHCP/DNS/HTTPS con SELinux Enforcing y firewalld
-  activos; prueba por separado cualquier aplicación de virtualización Flatpak.
+  activos; los agentes invitados QEMU/SPICE sí están incluidos. Prueba por separado
+  cualquier aplicación de virtualización Flatpak.
 
 Registra dentro de la VM `mokutil --sb-state`, `getenforce`, `systemctl --failed`,
 `bootc status`, `findmnt` y journals pertinentes. No desactives protecciones para

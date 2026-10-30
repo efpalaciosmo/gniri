@@ -8,6 +8,7 @@ enable tuned.service
 enable tuned-ppd.service
 enable bootc-fetch-apply-updates.timer
 enable gniri-flatpak-system-repo.service
+enable qemu-guest-agent.service
 disable sshd.service
 disable rpm-ostreed-automatic.timer
 disable dnf-automatic.timer

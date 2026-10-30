@@ -16,14 +16,27 @@ for command in ('aplay', 'arecord', 'alsamixer', 'pw-cli', 'pw-dump', 'pw-top',
                 'pactl', 'nmcli', 'nmtui', 'iw', 'bluetoothctl', 'btmon',
                 'tuned-adm', 'zramctl', 'brightnessctl', 'openvpn', 'glxinfo',
                 'eglinfo', 'vulkaninfo', 'vainfo', 'amd-smi', 'nvtop', 'sensors',
-                'cam', 'ideviceinfo', 'ratbagd', 'pamu2fcfg'):
+                'cam', 'ideviceinfo', 'ratbagd', 'pamu2fcfg', 'qemu-ga',
+                'spice-vdagent', 'spice-vdagentd'):
     assert shutil.which(command), f'Missing hardware/diagnostic command: {command}'
 
-# Virtualization applications are user-installed, not part of the host image.
-assert not subprocess.check_output(['rpm', '-qa', '--qf', '%{NAME}\n',
-                                   'qemu*', 'libvirt*', 'virt-manager', 'virt-install',
-                                   'virt-viewer', 'swtpm*', 'edk2-*'], text=True).strip(), \
-    'Unexpected host virtualization packages'
+# Virtualization applications are user-installed; only guest integration is bundled.
+virtualization_packages = set(subprocess.check_output([
+    'rpm', '-qa', '--qf', '%{NAME}\n', 'qemu*', 'libvirt*', 'virt-manager',
+    'virt-install', 'virt-viewer', 'swtpm*', 'edk2-*'], text=True).splitlines())
+assert not virtualization_packages - {'qemu-guest-agent'}, 'Unexpected host virtualization packages'
+
+# Fedora activates these agents through virtio ports, not unconditionally at boot.
+# Its user unit is pulled in by graphical-session.target in both GNOME and Niri.
+for path in ('/usr/lib/systemd/system/qemu-guest-agent.service',
+             '/usr/lib/systemd/system/spice-vdagentd.service',
+             '/usr/lib/systemd/system/spice-vdagentd.socket',
+             '/usr/lib/systemd/user/spice-vdagent.service',
+             '/usr/lib/systemd/user/graphical-session.target.wants/spice-vdagent.service',
+             '/usr/lib/udev/rules.d/99-qemu-guest-agent.rules',
+             '/usr/lib/udev/rules.d/70-spice-vdagentd.rules'):
+    require_file(path)
+subprocess.run(['systemctl', 'is-enabled', 'qemu-guest-agent.service'], check=True)
 
 require_file('/usr/share/alsa/ucm2/ucm.conf')
 # Check libraries and dynamic drivers without requiring a display or GPU.
@@ -58,7 +71,7 @@ for kernel in Path('/usr/lib/modules').iterdir():
     if not kernel.is_dir():
         continue
     for module in ('rtw89_8852ce', 'iwlwifi', 'btusb', 'btrtl', 'snd_hda_intel',
-                   'snd_usb_audio', 'snd_sof', 'zram'):
+                   'snd_usb_audio', 'snd_sof', 'zram', 'virtio_gpu', 'virtio_console'):
         subprocess.run(['modinfo', '-k', kernel.name, module], check=True,
                        stdout=subprocess.DEVNULL)
     assert 'CONFIG_ZRAM_BACKEND_ZSTD=y' in (kernel / 'config').read_text()

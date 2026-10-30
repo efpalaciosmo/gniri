@@ -9,7 +9,8 @@ shim, GRUB y kernel oficial, sin UKI propio ni backend composefs nativo.
 SELinux es permisivo solo en la ISO instaladora; Gniri instalado debe usar Enforcing.
 
 Incluye Ghostty, Waybar/Fuzzel/Mako, Zathura, vi/Vim, Zsh/Starship, Tailscale,
-Podman/Distrobox; no incluye QEMU, libvirt ni virt-manager en el host.
+Podman/Distrobox; no incluye el hipervisor QEMU, libvirt ni virt-manager en el host.
+Sí incluye `qemu-guest-agent` y `spice-vdagent` para ejecutarse como invitado en VM.
 Las aplicaciones adicionales se instalan con Flatpak. Usa drivers Fedora para AMD/Intel,
 PipeWire, OpenVPN, TuneD y zram. Los [manifiestos](packages/) y la
 [lista de lanzadores](packages/visible-applications.allow) definen los paquetes;

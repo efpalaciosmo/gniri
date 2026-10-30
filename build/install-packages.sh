@@ -23,9 +23,11 @@ EOF
 "${dnf[@]}" install "${packages[@]}"
 
 # Do not inherit a host virtualization stack (including foreign-CPU binfmt).
+# Keep the guest agent: Gniri can itself run inside a QEMU/KVM VM.
 # Leave unrelated dependencies alone instead of running a general autoremove.
 mapfile -t virtualization_packages < <(rpm -qa --qf '%{NAME}\n' \
-    'qemu*' 'libvirt*' 'virt-manager' 'virt-install' 'virt-viewer' 'swtpm*' 'edk2-*')
+    'qemu*' 'libvirt*' 'virt-manager' 'virt-install' 'virt-viewer' 'swtpm*' 'edk2-*' |
+    sed '/^qemu-guest-agent$/d')
 if ((${#virtualization_packages[@]})); then
     "${dnf[@]}" --setopt=clean_requirements_on_remove=False remove "${virtualization_packages[@]}"
 fi

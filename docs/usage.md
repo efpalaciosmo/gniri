@@ -64,7 +64,7 @@ comprueba primero `flatpak list --system --columns=application,origin`; solo si
 no se usa, retíralo con `sudo flatpak remote-delete --system fedora`, sin `--force`.
 Podman/Distrobox no crean ni descargan contenedores hasta solicitarlos.
 
-La imagen no incluye QEMU, libvirt ni virt-manager, no habilita sus sockets ni
+La imagen no incluye el hipervisor QEMU, libvirt ni virt-manager, no habilita sus sockets ni
 concede acceso polkit a máquinas virtuales. Puedes instalar aplicaciones de
 virtualización mediante Flatpak; un cliente que dependa de libvirt en el host
 no obtiene ese backend automáticamente. Los discos y datos existentes bajo
@@ -122,6 +122,47 @@ promesa de H.264/HEVC acelerado que Fedora excluya. Las reglas OpenRGB/Solaar no
 instalan sus GUI. Las herramientas U2F/Yubico no cambian PAM/authselect ni exigen
 llave para entrar. Adaptadores Xbox propietarios pueden necesitar drivers externos.
 Revisa nombres de conexiones y datos sensibles antes de compartir diagnósticos.
+
+### Gniri como invitado en QEMU/KVM (SPICE)
+
+La imagen incluye `spice-vdagent` para integración SPICE y `qemu-guest-agent`
+para comunicación con el hipervisor; este último no cambia la resolución.
+Fedora inicia los servicios al detectar sus canales virtio. El agente de sesión
+SPICE se inicia con `graphical-session.target`, también en Niri desde GDM;
+no añadas otro `spawn-at-startup` a tus dotfiles.
+
+Con la VM apagada, configura en el anfitrión:
+
+- Vídeo **Virtio**, pantalla **SPICE** y canal `com.redhat.spice.0` de tipo
+  `spicevmc`. Para Niri usa aceleración 3D/OpenGL compatible con el anfitrión.
+- Canal de agente QEMU `org.qemu.guest_agent.0` si deseas esa integración.
+- En virt-manager/virt-viewer activa **Auto resize VM with window**. Escalar la
+  imagen del visor no es lo mismo que cambiar la resolución del invitado.
+
+Arranca una imagen que contenga estos paquetes y prueba redimensionar el visor
+en GNOME y Niri. El cambio en el repositorio no instala nada en un deployment
+existente: actualiza por el canal firmado habitual y reinicia manualmente.
+En Niri evita fijar `mode`/`modeline` para la salida virtual en tus dotfiles si
+quieres seguir el modo preferido que anuncia la VM. La disponibilidad de resize
+y portapapeles depende del visor, GPU virtual y compositor/Wayland; instalar los
+agentes no garantiza todas las funciones en cualquier hipervisor.
+
+Diagnóstico dentro del invitado:
+
+```sh
+rpm -q spice-vdagent qemu-guest-agent
+ls -l /dev/virtio-ports/
+systemctl status spice-vdagentd.socket spice-vdagentd.service qemu-guest-agent.service
+systemctl --user status spice-vdagent.service
+journalctl -b -u spice-vdagentd.service -u qemu-guest-agent.service
+journalctl --user -b -u spice-vdagent.service
+niri msg outputs  # Solo dentro de Niri; compara antes/después de redimensionar.
+```
+
+Sin los canales correspondientes es normal que los servicios estén inactivos;
+no los fuerces a arrancar en hardware físico. No se necesitan puertos de red,
+cambios de firewall ni desactivar SELinux. Si hay una regresión, arranca el
+deployment anterior sin borrar dotfiles ni datos de la VM.
 
 ## Actualizaciones
 

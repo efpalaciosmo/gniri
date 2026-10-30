@@ -47,8 +47,11 @@ NetworkManager-openvpn-gnome
 NetworkManager-wifi
 nvtop
 openrgb-udev-rules
+# Guest integration, not a host virtualization stack.
+qemu-guest-agent
 realtek-firmware
 solaar-udev
+spice-vdagent
 steam-devices
 tuned
 tuned-ppd
