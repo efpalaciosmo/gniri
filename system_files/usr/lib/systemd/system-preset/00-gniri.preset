@@ -6,6 +6,7 @@ enable firewalld.service
 enable tailscaled.service
 enable tuned.service
 enable tuned-ppd.service
+enable fstrim.timer
 enable bootc-fetch-apply-updates.timer
 enable gniri-flatpak-system-repo.service
 enable qemu-guest-agent.service

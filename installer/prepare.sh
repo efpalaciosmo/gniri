@@ -4,12 +4,15 @@ set -euo pipefail
 # osbuild runs tmpfiles with the build root's /usr mounted read-only. The base
 # has a rule for this absent directory; create it before freezing the image.
 install -d -m 0755 /usr/local/sbin
+mapfile -t platform_packages < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' /run/gniri-hardware-platform.txt)
 dnf5 -y --refresh --setopt=keepcache=True --setopt=install_weak_deps=False upgrade
 dnf5 -y --setopt=keepcache=True --setopt=install_weak_deps=False install \
     anaconda anaconda-install-img-deps anaconda-dracut \
     dracut-config-generic dracut-network net-tools grub2-efi-x64-cdboot \
     grub2-pc-modules plymouth default-fonts-core-sans default-fonts-other-sans \
-    google-noto-sans-cjk-fonts xorrisofs squashfs-tools isomd5sum
+    google-noto-sans-cjk-fonts xorrisofs squashfs-tools isomd5sum \
+    "${platform_packages[@]}"
+python3 /run/gniri-validate-hardware-platform.py /run/gniri-hardware-platform.txt
 python3 /run/gniri-fix-anaconda.py
 # Only this disposable installer environment follows Anaconda's permissive
 # runtime model. Keep SELinux enabled so its policy remains available to bootc.

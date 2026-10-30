@@ -17,7 +17,8 @@ for command in ('aplay', 'arecord', 'alsamixer', 'pw-cli', 'pw-dump', 'pw-top',
                 'tuned-adm', 'zramctl', 'brightnessctl', 'openvpn', 'glxinfo',
                 'eglinfo', 'vulkaninfo', 'vainfo', 'amd-smi', 'nvtop', 'sensors',
                 'cam', 'ideviceinfo', 'ratbagd', 'pamu2fcfg', 'qemu-ga',
-                'spice-vdagent', 'spice-vdagentd'):
+                'spice-vdagent', 'spice-vdagentd', 'lspci', 'lsusb', 'nvme',
+                'smartctl', 'ethtool', 'fwupdmgr', 'fstrim'):
     assert shutil.which(command), f'Missing hardware/diagnostic command: {command}'
 
 # Virtualization applications are user-installed; only guest integration is bundled.
@@ -48,11 +49,8 @@ assert any(Path('/etc/OpenCL/vendors').glob('*.icd')), 'OpenCL ICD is required'
 subprocess.run(['python3', '-c', 'import amdsmi'], check=True)
 for module in ('pam_u2f.so', 'pam_yubico.so'):
     ctypes.CDLL('/usr/lib64/security/' + module)
-assert any(Path('/usr/lib/firmware').rglob('sof-*.ri*')), 'SOF firmware is required'
-assert any(Path('/usr/lib/firmware').glob('iwlwifi-*.ucode*')), 'Intel Wi-Fi firmware is required'
-for firmware in ('rtw89/rtw8852c_fw-2.bin', 'rtl_bt/rtl8852cu_fw.bin'):
-    assert any(Path('/usr/lib/firmware', firmware + suffix).is_file()
-               for suffix in ('', '.xz', '.zst')), f'Missing firmware: {firmware}'
+subprocess.run(['python3', str(Path(__file__).with_name('validate-hardware-platform.py')),
+                str(Path(__file__).parent / 'packages/hardware-platform.txt')], check=True)
 
 # These plugins are loaded dynamically; an installed main executable is not enough.
 for plugin in ('alsa/libspa-alsa.so', 'bluez5/libspa-bluez5.so'):
@@ -65,13 +63,12 @@ require_file('/usr/lib/NetworkManager/VPN/nm-openvpn-service.name')
 for library in ('libnm-vpn-plugin-openvpn.so', 'libnm-vpn-plugin-openvpn-editor.so'):
     ctypes.CDLL('/usr/lib64/NetworkManager/' + library)
 subprocess.run(['systemctl', 'is-enabled', 'tuned.service', 'tuned-ppd.service',
-                'NetworkManager.service', 'bluetooth.service'], check=True)
+                'NetworkManager.service', 'bluetooth.service', 'fstrim.timer'], check=True)
 
 for kernel in Path('/usr/lib/modules').iterdir():
     if not kernel.is_dir():
         continue
-    for module in ('rtw89_8852ce', 'iwlwifi', 'btusb', 'btrtl', 'snd_hda_intel',
-                   'snd_usb_audio', 'snd_sof', 'zram', 'virtio_gpu', 'virtio_console'):
+    for module in ('zram', 'virtio_gpu', 'virtio_console'):
         subprocess.run(['modinfo', '-k', kernel.name, module], check=True,
                        stdout=subprocess.DEVNULL)
     assert 'CONFIG_ZRAM_BACKEND_ZSTD=y' in (kernel / 'config').read_text()

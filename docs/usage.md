@@ -136,6 +136,8 @@ journalctl -b -u gniri-flatpak-system-repo.service
 
 Se conserva la pila Fedora: amdgpu/Mesa, firmware AMD/Intel/Wi-Fi, PipeWire y
 WirePlumber. Herramientas instaladas no equivalen a compatibilidad física probada.
+La [política de cobertura de hardware](hardware.md) describe los paquetes compartidos
+por escritorio/instalador, los checks independientes del equipo y el diagnóstico.
 
 | Área | Comprobaciones |
 | --- | --- |
@@ -145,6 +147,7 @@ WirePlumber. Herramientas instaladas no equivalen a compatibilidad física proba
 | Bluetooth | `bluetoothctl show`, `rfkill list`, `journalctl -b -u bluetooth` |
 | Energía | `tuned-adm active`; perfiles GNOME mediante TuneD/tuned-ppd |
 | Memoria | `zramctl`, `swapon --show`, `cat /sys/block/zram0/comp_algorithm` |
+| Inventario/SSD | `lspci -nnk`, `lsusb`, `sudo nvme smart-log /dev/nvme0`, `sudo smartctl -a /dev/nvme0`, `systemctl status fstrim.timer` |
 
 OpenVPN: Settings → Network → VPN → Import from file. No se inicia ningún túnel
 ni se incluyen credenciales. Bluetooth negocia perfiles/códecs según el equipo;

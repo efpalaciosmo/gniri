@@ -1,0 +1,34 @@
+# Shared by the desktop and installer: stock Fedora drivers, firmware and graphics.
+# Weak dependencies are disabled in both builds; request these explicitly.
+# Keep vendor coverage independent of the hardware on the build/test machine.
+alsa-sof-firmware
+amd-gpu-firmware
+amd-ucode-firmware
+atheros-firmware
+brcmfmac-firmware
+cirrus-audio-firmware
+intel-audio-firmware
+intel-gpu-firmware
+intel-vsc-firmware
+iwlbluetooth-firmware
+iwlwifi-mld-firmware
+iwlwifi-mvm-firmware
+kernel-core
+kernel-modules
+kernel-modules-extra
+linux-firmware
+mediatek-firmware
+mesa-dri-drivers
+mesa-libEGL
+mesa-libgbm
+mesa-vulkan-drivers
+microcode_ctl
+mt7xxx-firmware
+NetworkManager
+NetworkManager-wifi
+nvidia-gpu-firmware
+nxpwireless-firmware
+qcom-wwan-firmware
+realtek-firmware
+tiwilink-firmware
+wireless-regdb

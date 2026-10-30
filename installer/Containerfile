@@ -4,11 +4,13 @@ COPY installer/prepare.sh /run/gniri-installer-prepare.sh
 COPY installer/fix-anaconda.py /run/gniri-fix-anaconda.py
 COPY installer/write-buildstamp.py /run/gniri-write-buildstamp.py
 COPY build/normalize-boot.py /run/gniri-normalize-boot.py
+COPY packages/hardware-platform.txt /run/gniri-hardware-platform.txt
+COPY build/validate-hardware-platform.py /run/gniri-validate-hardware-platform.py
 RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
     bash /run/gniri-installer-prepare.sh \
     && python3 /run/gniri-normalize-boot.py \
     && rm -rf /var/lib/dnf/* /var/log/dnf* /var/log/hawkey.log \
-    && rm /run/gniri-installer-prepare.sh /run/gniri-fix-anaconda.py /run/gniri-write-buildstamp.py /run/gniri-normalize-boot.py
+    && rm /run/gniri-installer-prepare.sh /run/gniri-fix-anaconda.py /run/gniri-write-buildstamp.py /run/gniri-normalize-boot.py /run/gniri-hardware-platform.txt /run/gniri-validate-hardware-platform.py
 ARG PAYLOAD_REF
 ARG TARGET_REF
 COPY scripts/iso-common.sh /run/gniri-iso-common.sh

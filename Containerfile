@@ -28,7 +28,7 @@ LABEL containers.bootc="1" \
 COPY system_files/ /run/gniri-build/system_files/
 COPY trust/ /run/gniri-build/trust/
 COPY packages/visible-applications.allow /run/gniri-build/packages/
-COPY build/configure-image.py build/configure-rpm-ostree.py build/signature-policy.py build/validate-image.sh build/validate-hardware.py build/validate-accounts.py build/finalize-image.py build/normalize-boot.py build/install-system-files.py /run/gniri-build/
+COPY build/configure-image.py build/configure-rpm-ostree.py build/signature-policy.py build/validate-image.sh build/validate-hardware.py build/validate-hardware-platform.py build/validate-accounts.py build/finalize-image.py build/normalize-boot.py build/install-system-files.py /run/gniri-build/
 RUN python3 /run/gniri-build/install-system-files.py /run/gniri-build/system_files \
     && python3 /run/gniri-build/configure-rpm-ostree.py \
     && python3 /run/gniri-build/configure-image.py "${IMAGE_REF}" "${BASE_IMAGE}" "${SOURCE_REVISION}" "${FEDORA_VERSION}" \

@@ -28,6 +28,10 @@ débiles. Los fondos se eligen desde `VERSION_ID`; los lanzadores se validan con
 oficial; Ghostty usa el COPR `scottames/ghostty`, limitado a ese paquete y con
 verificación de firmas RPM. [Las descargas upstream](../build/upstream.env) tienen versión/checksum
 fijos. Los RPM siguen repositorios vivos: no hay reproducibilidad bit a bit.
+`packages/hardware-platform.txt` se instala tanto en el escritorio como en el
+instalador; ambos validan paquetes e infraestructura del kernel sin acceder al
+hardware anfitrión ni exigir modelos o blobs de dispositivos concretos.
+La [política de hardware](hardware.md) distingue estos checks de las pruebas físicas.
 
 La finalización elimina el marcador temporal `/run/systemd/systemd-units-load`
 y su directorio si queda vacío. No borra contenido desconocido de `/run/systemd`:
