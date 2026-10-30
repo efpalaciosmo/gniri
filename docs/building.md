@@ -29,6 +29,10 @@ oficial; Ghostty usa el COPR `scottames/ghostty`, limitado a ese paquete y con
 verificación de firmas RPM. [Las descargas upstream](../build/upstream.env) tienen versión/checksum
 fijos. Los RPM siguen repositorios vivos: no hay reproducibilidad bit a bit.
 
+La finalización elimina el marcador temporal `/run/systemd/systemd-units-load`
+y su directorio si queda vacío. No borra contenido desconocido de `/run/systemd`:
+`bootc container lint --fatal-warnings` sigue siendo obligatorio.
+
 Las transacciones omiten documentación RPM (`tsflags=nodocs`), conservando licencias.
 No se incluye la pila de virtualización del host: QEMU, libvirt, virt-manager,
 firmware de invitados ni TPM virtual. También se retiran emuladores QEMU/binfmt
