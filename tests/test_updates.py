@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 UPDATES = runpy.run_path(str(ROOT / 'system_files/usr/bin/gniri-stage-update'))
-REFERENCE = 'ghcr.io/example/gniri:stable'
+REFERENCE = 'quay.io/example/gniri:stable'
 
 
 def host(signature='containerPolicy'):
@@ -40,7 +40,15 @@ class UpdateTests(unittest.TestCase):
 
     def test_manual_source_change_is_not_overridden(self):
         status = host()
-        status['spec']['image']['image'] = 'ghcr.io/other/system:stable'
+        status['spec']['image']['image'] = 'quay.io/other/system:stable'
+        with patch('subprocess.run') as run, self.assertRaises(UPDATES['UpdateSkipped']):
+            UPDATES['stage_update'](REFERENCE, status)
+        run.assert_not_called()
+
+    def test_existing_ghcr_installation_is_not_automatically_switched_to_quay(self):
+        status = host()
+        for image in (status['spec']['image'], status['status']['booted']['image']['image']):
+            image['image'] = 'ghcr.io/example/gniri:stable'
         with patch('subprocess.run') as run, self.assertRaises(UPDATES['UpdateSkipped']):
             UPDATES['stage_update'](REFERENCE, status)
         run.assert_not_called()

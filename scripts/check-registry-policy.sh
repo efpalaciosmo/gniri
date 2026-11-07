@@ -4,14 +4,14 @@ set -euo pipefail
 source_image=${1:?Local candidate image required}
 repository=${2:?Published Gniri repository required}
 good_digest=${3:?Signed candidate digest required}
-[[ $repository =~ ^ghcr.io/[a-z0-9._/-]+$ && $good_digest =~ ^sha256:[a-f0-9]{64}$ ]]
+[[ $repository =~ ^quay\.io/[a-z0-9._/-]+$ && $good_digest =~ ^sha256:[a-f0-9]{64}$ ]]
 [[ ${GITHUB_ACTIONS:-} == true ]]
 work=$(mktemp -d)
 trap 'rm -r -- "$work"' EXIT
 # Host Podman/Cosign logins are not inherited by the disposable container.
-# Keep credentials ephemeral and outside the image, including for private GHCR.
-printf '%s' "${REGISTRY_TOKEN:?Registry token required}" | sudo podman login ghcr.io \
-    --authfile "$work/auth.json" --username "${GITHUB_ACTOR:?GitHub actor required}" --password-stdin
+# Keep credentials ephemeral and outside the image, including for private Quay repositories.
+printf '%s' "${REGISTRY_TOKEN:?Registry token required}" | sudo podman login quay.io \
+    --authfile "$work/auth.json" --username "${REGISTRY_USERNAME:?Registry username required}" --password-stdin
 run_id="${GITHUB_RUN_ID:?}-${GITHUB_RUN_ATTEMPT:?}"
 for kind in unsigned wrong-key; do
     printf 'FROM %s\nLABEL gniri.policy-test="%s-%s"\n' "$source_image" "$run_id" "$kind" |

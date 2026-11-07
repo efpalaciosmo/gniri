@@ -27,8 +27,8 @@ def main():
     parser.add_argument('image')
     parser.add_argument('--key', type=Path, default=Path(__file__).resolve().parents[1] / 'trust/cosign.pub')
     args = parser.parse_args()
-    if not re.fullmatch(r'ghcr.io/[a-z0-9._/-]+(?::(?:stable|latest)|@sha256:[a-f0-9]{64})', args.image):
-        parser.error('Use a fully qualified stable/latest channel or immutable GHCR digest')
+    if not re.fullmatch(r'quay\.io/[a-z0-9._/-]+(?::(?:stable|latest)|@sha256:[a-f0-9]{64})', args.image):
+        parser.error('Use a fully qualified stable/latest channel or immutable Quay.io digest')
     if os.geteuid() == 0:
         parser.error('Run as the existing desktop user, not sudo/root')
     account = pwd.getpwuid(os.geteuid())

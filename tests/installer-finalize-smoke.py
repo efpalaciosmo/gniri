@@ -56,7 +56,7 @@ def check_layout(separate_boot):
             (tree / 'var').mkdir()
             (tree / 'usr/lib').mkdir()
             (tree / 'usr/lib/os-release').write_text('ID=fedora\nVERSION_ID=45\n')
-            target = 'ghcr.io/example/gniri:stable'
+            target = 'quay.io/example/gniri:stable'
             prepare_trust(tree, target)
             # Real kernel/initramfs layout; the smoke test does not boot it.
             kernel = next(Path('/usr/lib/modules').glob('*/vmlinuz'))

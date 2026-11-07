@@ -14,7 +14,7 @@ POLICIES = runpy.run_path(str(ROOT / 'build/signature-policy.py'))
 BASE = runpy.run_path(str(ROOT / 'scripts/build-image.py'))
 GATE = runpy.run_path(str(ROOT / 'scripts/release-gate.py'))
 UPDATES = runpy.run_path(str(ROOT / 'system_files/usr/bin/gniri-stage-update'))
-REPOSITORY = 'ghcr.io/example/gniri'
+REPOSITORY = 'quay.io/example/gniri'
 DIGEST = 'sha256:' + 'a' * 64
 REVISION = 'b' * 40
 

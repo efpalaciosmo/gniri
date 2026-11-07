@@ -52,6 +52,9 @@ def configure(repository, reviewer, make_public=False):
     missing = {'COSIGN_PRIVATE_KEY', 'COSIGN_PASSWORD'} - secrets
     if missing:
         raise ValueError(f'Configure existing signing material first: {sorted(missing)}; no keys were generated or rotated')
+    missing = {'QUAY_USERNAME', 'QUAY_TOKEN'} - secrets
+    if missing:
+        raise ValueError(f'Configure Quay robot-account secrets first: {sorted(missing)}')
     if repo.get('private'):
         subprocess.run(['gh', 'repo', 'edit', repository, '--visibility', 'public',
                         '--accept-visibility-change-consequences'], check=True)
@@ -86,9 +89,8 @@ def configure(repository, reviewer, make_public=False):
         raise ValueError('Expected exactly one deployment policy: branch main')
     print(f'Configured and verified: {repository} is public; stable requires {reviewer}, branch main only.')
     print('Existing signing secrets were preserved. Approval remains a human action.')
-    owner = repository.split('/')[0]
-    print('GHCR visibility is separate and has no documented update API. If anonymous pulls fail, '
-          f'make the package public once at https://github.com/users/{owner}/packages/container/gniri/settings')
+    print('Quay setup is separate: create a public gniri repository, grant the robot account write access, '
+          'and set the Actions variable QUAY_NAMESPACE if it differs from the GitHub owner; see docs/building.md.')
 
 
 def main():

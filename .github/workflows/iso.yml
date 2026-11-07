@@ -18,7 +18,9 @@ on:
 
 permissions:
   contents: read
-  packages: read
+
+env:
+  QUAY_NAMESPACE: ${{ vars.QUAY_NAMESPACE }}
 
 concurrency:
   group: iso-${{ github.ref }}-${{ inputs.channel }}
@@ -45,20 +47,22 @@ jobs:
           cosign-release: v3.1.3
       - name: Authenticate registry reads
         env:
-          REGISTRY_TOKEN: ${{ github.token }}
+          REGISTRY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+          REGISTRY_TOKEN: ${{ secrets.QUAY_TOKEN }}
         run: |
-          printf '%s' "$REGISTRY_TOKEN" | sudo podman login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          printf '%s' "$REGISTRY_TOKEN" | sudo env "PATH=$PATH" cosign login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          test -n "$REGISTRY_USERNAME"
+          test -n "$REGISTRY_TOKEN"
+          printf '%s' "$REGISTRY_TOKEN" | sudo podman login quay.io -u "$REGISTRY_USERNAME" --password-stdin
+          printf '%s' "$REGISTRY_TOKEN" | sudo env "PATH=$PATH" cosign login quay.io -u "$REGISTRY_USERNAME" --password-stdin
       - name: Resolve installer payload
         id: payload
         env:
-          OWNER: ${{ github.repository_owner }}
           CHANNEL: ${{ inputs.channel }}
           REQUESTED_DIGEST: ${{ inputs.digest }}
         run: |
           set -euo pipefail
           [[ $CHANNEL == stable || $CHANNEL == latest ]]
-          image="ghcr.io/${OWNER,,}/gniri"
+          image=$(python3 scripts/registry.py "$GITHUB_REPOSITORY")
           target="$image:$CHANNEL"
           digest=$REQUESTED_DIGEST
           if [[ -z $digest ]]; then

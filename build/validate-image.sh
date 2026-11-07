@@ -23,7 +23,7 @@ assert not {'selinux=0', 'enforcing=0'}.intersection(inspection['kargs']), 'Do n
 kernel = inspection['kernel']
 assert kernel and kernel['unified'] is False, 'Keep the stock kernel/initramfs boot path, not a custom UKI'
 reference = Path('/usr/share/gniri/image-reference').read_text().strip()
-if reference.startswith('ghcr.io/'):
+if reference.startswith('quay.io/'):
     policy = json.loads(Path('/usr/share/gniri/bootc-policy.json').read_text())
     assert policy['default'] == [{'type': 'reject'}], 'bootc must not inherit an insecure policy default'
     repository = reference.rsplit(':', 1)[0]

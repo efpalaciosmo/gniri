@@ -2,7 +2,7 @@
 """Real Skopeo regression, with ephemeral TLS/auth/signatures and no external network.
 
 Run only as root INSIDE a disposable container: its policy/key/auth configuration
-is replaced with test fixtures. No production signing key or GHCR token is used.
+is replaced with test fixtures. No production signing key or Quay token is used.
 """
 import base64
 import gzip

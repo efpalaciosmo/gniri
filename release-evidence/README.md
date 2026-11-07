@@ -2,9 +2,9 @@
 
 La promoción no acepta un build verde como prueba de arranque. Después de
 construir y firmar un candidato, genera su ISO con `make iso-candidate
-PAYLOAD_REF=ghcr.io/OWNER/gniri@sha256:DIGEST` y ejecuta `docs/testing.md`.
+PAYLOAD_REF=quay.io/OWNER/gniri@sha256:DIGEST` y ejecuta `docs/testing.md`.
 Para probar la ISO de producción antes de cambiar el tag, también se puede usar
-`make iso-published` con el mismo digest y `TARGET_REF=ghcr.io/OWNER/gniri:stable`.
+`make iso-published` con el mismo digest y `TARGET_REF=quay.io/OWNER/gniri:stable`.
 
 Genera el registro inicial sin marcar resultados como aprobados:
 

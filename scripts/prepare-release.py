@@ -9,6 +9,7 @@ import runpy
 import shutil
 
 validate = runpy.run_path(str(Path(__file__).with_name('release-gate.py')))['validate']
+image_repository = runpy.run_path(str(Path(__file__).with_name('registry.py')))['image_repository']
 ISO_NAME = 'gniri-x86_64.iso'
 PART_SIZE = 1024 ** 3  # GitHub release assets must be smaller than 2 GiB.
 
@@ -38,7 +39,7 @@ def prepare_release(artifacts, output, record, run, repository, part_size=PART_S
             raise ValueError(f'Missing regular candidate artifact: {name}')
     metadata = json.loads((artifacts / 'build.json').read_text())
     template = json.loads((artifacts / 'validation.json').read_text())
-    image = f'ghcr.io/{repository.split("/")[0].lower()}/gniri'
+    image = image_repository(repository)
     expected_checksum = f'{record["iso_sha256"]}  {ISO_NAME}'
     if (metadata.get('payload_reference') != f'{image}@{digest}'
             or metadata.get('source_revision') != revision

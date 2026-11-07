@@ -1,5 +1,5 @@
 IMAGE ?= localhost/gniri:development
-UPDATE_REF ?= ghcr.io/efpalaciosmo/gniri:stable
+UPDATE_REF ?= quay.io/efpalaciosmo/gniri:stable
 SOURCE_URL ?=
 BUILD_NETWORK ?=
 RECHUNK ?= 0
@@ -16,9 +16,9 @@ help:
 	@echo 'make build REFRESH=1 - resolve latest stable Fedora and rerun RPM transactions'
 	@echo 'make iso    - create an installer from the verified published stable image'
 	@echo 'make iso-local - development-only installer; no registry updates'
-	@echo 'make iso-candidate PAYLOAD_REF=ghcr.io/owner/gniri@sha256:... - test a signed candidate on latest'
+	@echo 'make iso-candidate PAYLOAD_REF=quay.io/owner/gniri@sha256:... - test a signed candidate on latest'
 	@echo 'make iso BUILD_NETWORK=host - use host networking if container DNS is failing'
-	@echo 'make iso-published PAYLOAD_REF=ghcr.io/owner/gniri@sha256:... TARGET_REF=ghcr.io/owner/gniri:stable'
+	@echo 'make iso-published PAYLOAD_REF=quay.io/owner/gniri@sha256:... TARGET_REF=quay.io/owner/gniri:stable'
 
 check:
 	python3 scripts/check.py

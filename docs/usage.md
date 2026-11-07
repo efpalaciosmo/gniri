@@ -210,7 +210,7 @@ deployment anterior sin borrar dotfiles ni datos de la VM.
 
 ## Actualizaciones
 
-Solo las instalaciones con origen GHCR publicado tienen actualizaciones; la ISO
+Solo las instalaciones con origen Quay.io publicado tienen actualizaciones; la ISO
 local de desarrollo no tiene registro. Los equipos siguen `gniri:stable`, no el
 tag base Fedora. El domingo a las 10:00 local se prepara una actualización, con
 hasta 30 minutos de retraso. `Persistent=true` recupera ejecuciones perdidas al
@@ -254,7 +254,7 @@ con origen local.
 ### Si desaparece la cuenta del login después de un rebase
 
 Antes de una migración nueva, desde el usuario de escritorio existente ejecuta
-`python3 scripts/check-rebase.py ghcr.io/efpalaciosmo/gniri:stable` desde un
+`python3 scripts/check-rebase.py quay.io/efpalaciosmo/gniri:stable` desde un
 checkout confiable. Requiere Skopeo, Cosign y Podman. Verifica el digest firmado,
 la versión, que la cuenta sea local y que la imagen proporcione su shell y GDM;
 no cambia usuarios ni ejecuta el rebase. Que pase el preflight no sustituye la

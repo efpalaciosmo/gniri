@@ -8,7 +8,7 @@ PROMOTE = runpy.run_path(str(ROOT / 'scripts/promote-image.py'))
 GATE = runpy.run_path(str(ROOT / 'scripts/release-gate.py'))
 DIGEST = 'sha256:' + 'a' * 64
 REVISION = 'b' * 40
-IMAGE = 'ghcr.io/example/gniri'
+IMAGE = 'quay.io/example/gniri'
 
 
 class PromotionTests(unittest.TestCase):

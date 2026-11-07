@@ -80,11 +80,11 @@ si quieres reutilizar capas y cachés.
 
 ## ISO e instalación
 
-`make iso` resuelve `ghcr.io/efpalaciosmo/gniri:stable` a un digest y verifica su
+`make iso` resuelve `quay.io/efpalaciosmo/gniri:stable` a un digest y verifica su
 firma antes de generar el instalador. `UPDATE_REF` permite elegir otro
-repositorio GHCR terminado en `:stable`. Requiere Skopeo, Cosign y la clave pública
+repositorio Quay.io terminado en `:stable`. Requiere Skopeo, Cosign y la clave pública
 de un checkout confiable; no necesita credenciales si el paquete es público.
-Se conservan el origen GHCR y la exigencia de firma desde el primer arranque.
+Se conservan el origen Quay.io y la exigencia de firma desde el primer arranque.
 
 `make iso-local` instala deliberadamente `localhost/gniri:development` y no tiene
 actualizaciones de registro. Se reserva para desarrollo; publicar una imagen
@@ -122,27 +122,40 @@ SELinux es permisivo **solo en el instalador**; el destino solicita Enforcing.
 El workflow de imagen necesita los secretos Actions `COSIGN_PRIVATE_KEY` y
 `COSIGN_PASSWORD`, además de la clave pública correspondiente en `trust/cosign.pub`.
 Conserva las claves existentes; no las regeneres para repetir una construcción.
-`GITHUB_TOKEN` lo proporciona Actions con permiso `packages: write`; no necesitas
-un PAT para publicar desde CI. Las firmas OCI autentican la imagen y las
-actualizaciones; no sustituyen Secure Boot.
+Las firmas OCI autentican la imagen y las actualizaciones; no sustituyen Secure Boot.
+GitHub sigue alojando el código, Actions y los artefactos ISO; las imágenes y sus
+firmas se publican en **Quay.io**. `GITHUB_TOKEN` no autentica en Quay.
 
-En la configuración del paquete GHCR, permite al repositorio acceso Actions de
-lectura/escritura. Para descargar un paquete privado, inicia sesión con
-`docker login ghcr.io -u OWNER` (o `podman login`) y usa como contraseña un token
-clásico con `read:packages`.
+1. Crea el repositorio **público** `quay.io/NAMESPACE/gniri` en tu usuario u
+   organización de Quay. Su visibilidad es independiente de la del repositorio GitHub.
+   Las instalaciones necesitan lectura anónima para actualizarse; no se incluyen
+   credenciales de CI en la imagen ni en la ISO.
+2. Crea un robot en Quay y concédele **Write** sobre ese repositorio, para publicar
+   imágenes, firmas y fixtures negativos de la prueba de políticas.
+3. En GitHub → **Settings → Secrets and variables → Actions**, añade los secretos
+   `QUAY_USERNAME` (nombre completo `NAMESPACE+ROBOT`) y `QUAY_TOKEN` (token del robot).
+   No uses el login de GitHub ni un PAT. Los tres workflows usan estas credenciales;
+   generar una ISO no necesita la clave privada de firma.
+4. Si el namespace de Quay difiere del propietario GitHub en minúsculas, añade la
+   variable Actions `QUAY_NAMESPACE`. Todos los workflows y las herramientas de
+   promoción/release resuelven `quay.io/NAMESPACE/gniri` con la misma regla.
+   Para herramientas locales, exporta `QUAY_NAMESPACE`; para `make iso`, usa
+   `UPDATE_REF=quay.io/NAMESPACE/gniri:stable` si no es el namespace predeterminado.
 
-Para descargas y actualizaciones sin credenciales, haz público el paquete en
-**Package settings → Change visibility → Public**:
-`https://github.com/users/OWNER/packages/container/gniri/settings`.
-Hacer público el repositorio no hace público el paquete; cambiar la visibilidad
-del paquete a pública es irreversible. La API documentada de GitHub no permite
-automatizar ese cambio.
+Conserva `COSIGN_PRIVATE_KEY`, `COSIGN_PASSWORD` y `trust/cosign.pub`; cambiar de
+registro no requiere rotar la clave. No configures las credenciales Quay solo en
+el entorno `stable`: también las necesitan el build y la validación previa a la
+aprobación. Las PR no reciben estos secretos. El helper `scripts/setup-github.py`
+comprueba su presencia, pero no crea robots ni cambia la configuración de Quay.
+Para una descarga privada manual, usa `docker login quay.io -u 'NAMESPACE+ROBOT'`
+(o `podman login`) con un token de lectura como contraseña; esto no configura las
+credenciales del updater instalado.
 
 Los Actions están fijados por SHA. Dependabot propone sus actualizaciones
 semanalmente; Renovate gestiona las imágenes OCI y herramientas fijadas en
 scripts. Protege `main` con revisión y checks requeridos de sintaxis/tests e imagen.
 
-## Pipeline de imagen en GHCR
+## Pipeline de imagen en Quay.io
 
 [`.github/workflows/build.yml`](../.github/workflows/build.yml) contiene el job
 de candidatos `build`. Se ejecuta por cambios
@@ -153,14 +166,14 @@ durante períodos de alta carga.
 ```text
 PR → build: checks + construcción y regresiones de imagen
 main / sábado / ejecución manual → build: checks + construcción y regresiones
-                                        → firma por digest → GHCR :latest
+                                        → firma por digest → Quay.io :latest
                                         → inventarios y tamaños en Actions
 ```
 
 Las PR no publican ni usan secretos de firma. Desde `main`, el mismo job renueva
 las transacciones RPM, construye, repackea y valida Ghostty/Niri, Flatpak y
 políticas de firmas. Publica un candidato inmutable
-`sha-COMMIT-RUN_ID-ATTEMPT`, lo firma y verifica en GHCR; después actualiza `:latest`
+`sha-COMMIT-RUN_ID-ATTEMPT`, lo firma y verifica en Quay.io; después actualiza `:latest`
 al mismo digest. Este workflow no modifica `stable`, no construye ISOs ni crea Releases.
 
 El resumen incluye el comando de descarga, digest y tamaños. El artefacto
@@ -169,8 +182,8 @@ metadatos, digest e `image-size.json`: tamaño sin comprimir y bytes gzip de las
 capas. Se conserva 30 días; los blobs OCI temporales se descartan tras validarlos.
 
 ```sh
-docker pull ghcr.io/efpalaciosmo/gniri:latest
-# También: podman pull ghcr.io/efpalaciosmo/gniri:latest
+docker pull quay.io/efpalaciosmo/gniri:latest
+# También: podman pull quay.io/efpalaciosmo/gniri:latest
 ```
 
 `:latest` identifica la imagen firmada más reciente. El workflow no actualiza
@@ -186,11 +199,11 @@ prueba que siguen `:latest` conservan `:latest`, sin saltar de canal automática
 ### Generar una ISO desde GitHub
 
 El workflow manual [Build installer ISO](../.github/workflows/iso.yml) genera una
-ISO desde una imagen GHCR ya firmada, sin reconstruir el escritorio, publicar una
+ISO desde una imagen Quay.io ya firmada, sin reconstruir el escritorio, publicar una
 Release ni modificar `latest` o `stable`:
 
-1. Publica primero una imagen con **Build and publish image**. El paquete debe
-   permitir lectura al repositorio de Actions; `trust/cosign.pub` debe corresponder
+1. Publica primero una imagen con **Build and publish image**. El robot de Quay debe
+   tener acceso al repositorio de imagen; `trust/cosign.pub` debe corresponder
    a la firma. No se necesitan secretos de firma para generar la ISO.
 2. Abre **Actions → Build installer ISO → Run workflow**.
 3. Elige `stable` (predeterminado) o `latest` para probar candidatos. Si todavía
@@ -215,8 +228,8 @@ candidato publicado y firmado, usa su digest exacto:
 
 ```sh
 make iso-published REFRESH=1 \
-  PAYLOAD_REF=ghcr.io/owner/gniri@sha256:DIGEST \
-  TARGET_REF=ghcr.io/owner/gniri:stable
+  PAYLOAD_REF=quay.io/owner/gniri@sha256:DIGEST \
+  TARGET_REF=quay.io/owner/gniri:stable
 ```
 
 El script verifica Cosign antes de descargar el payload y requiere Cosign en el
@@ -245,6 +258,29 @@ Verifica antes de escribir medios o instalar. Los enlaces Source code generados
 por GitHub no son la ISO.
 
 ## Confianza y migración
+
+### Cambio de GHCR a Quay.io
+
+Las instalaciones e ISOs existentes conservan su origen GHCR: este cambio de
+código no las migra automáticamente. No basta sustituir el hostname en una
+política ni desactivar la verificación. Se recomienda copia/restauración verificada
+y reinstalación desde una ISO nueva con origen Quay.io.
+
+Las firmas están ligadas al repositorio (`matchRepository`): copiar blobs o tags
+desde GHCR no basta. Toda imagen trasladada debe verificarse en el origen y
+firmarse de nuevo para su referencia Quay con la clave confiable existente.
+La promoción sigue necesitando un `:stable` previo firmado en Quay para comprobar
+la versión y detectar cambios durante la revisión. Si se migra ese baseline,
+solo puede ser el digest `stable` ya revisado, conservado sin reconstrucción y
+verificado/firmado en el destino; no un candidato sin aprobar. Hasta disponer de
+ese baseline, prueba candidatos con `latest`; no se omite el gate de promoción.
+Ese baseline histórico no es una imagen migrada para instalar: genera la nueva
+ISO `stable` solo después de promover un candidato construido para Quay, con su
+política y referencia de actualización correctas.
+Las imágenes externas del constructor (`ghcr.io/osbuild/image-builder-cli`) no
+cambian de registro porque no son publicaciones de Gniri.
+
+### Política de firma
 
 La política general de contenedores conserva los valores Fedora más la regla
 Gniri. El updater usa `/usr/share/gniri/bootc-policy.json`, independiente y con

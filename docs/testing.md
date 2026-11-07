@@ -93,7 +93,7 @@ personalizada. No descarga ni instala aplicaciones.
 
 CI prueba además el precheck real de políticas offline y el cliente
 containers/image contra manifests firmados, sin firma y de clave incorrecta.
-El contenedor recibe un authfile temporal de GHCR montado en solo lectura;
+El contenedor recibe un authfile temporal de Quay.io montado en solo lectura;
 los logins del host no se heredan y las credenciales no se incluyen en la imagen.
 Un error DNS/autenticación no cuenta como rechazo de firma. El precheck offline
 **no** sustituye la prueba de actualización/rechazo con bootc en una VM arrancada.
@@ -117,7 +117,7 @@ No debe usarse `--insecure-policy` ni cambiar la política instalada para resolv
 La regresión sustituye política/clave/auth **solo dentro del contenedor desechable**;
 no modifica la imagen original, el host, el firewall ni SELinux. Al salir, `--rm`
 elimina esos fixtures. No usa claves de producción ni tokens GitHub y no reemplaza
-la prueba GHCR del candidato firmado real ni las pruebas bootc en VM.
+la prueba Quay.io del candidato firmado real ni las pruebas bootc en VM.
 
 ### Diagnóstico del fallo de publicación 40430420740
 

@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-REPOSITORY = 'ghcr.io/example/gniri'
+REPOSITORY = 'quay.io/example/gniri'
 DIGEST = 'sha256:' + 'a' * 64
 
 
@@ -31,15 +31,15 @@ with open(os.environ['COMMAND_LOG'], 'a') as log:
     log.write(json.dumps([name, *args]) + '\\n')
 if name == 'podman':
     if args[0] == 'login':
-        assert args[1] == 'ghcr.io'
-        assert args[args.index('--username') + 1] == 'ci-actor'
+        assert args[1] == 'quay.io'
+        assert args[args.index('--username') + 1] == 'example+ci'
         assert '--password-stdin' in args
         assert sys.stdin.read() == os.environ['REGISTRY_TOKEN']
         if os.environ.get('FAIL_LOGIN') == '1':
             sys.exit(7)
         auth = Path(args[args.index('--authfile') + 1])
         assert auth.parent.stat().st_mode & 0o777 == 0o700
-        auth.write_text(json.dumps({'auths': {'ghcr.io': {'auth': 'test-only'}}}))
+        auth.write_text(json.dumps({'auths': {'quay.io': {'auth': 'test-only'}}}))
     elif args[0] == 'build':
         assert 'LABEL gniri.policy-test=' in sys.stdin.read()
     elif args[0] == 'push':
@@ -50,9 +50,9 @@ if name == 'podman':
         assert len(auth_mounts) == 1
         source, destination, mode = auth_mounts[0].split(':')
         assert mode == 'ro'
-        assert 'ghcr.io' in json.loads(Path(source).read_text())['auths']
+        assert 'quay.io' in json.loads(Path(source).read_text())['auths']
         assert '--rm' in args
-        assert args[-3].startswith('ghcr.io/example/gniri@sha256:')
+        assert args[-3].startswith('quay.io/example/gniri@sha256:')
         sys.exit(int(os.environ.get('SMOKE_EXIT', '0')))
     else:
         sys.exit(99)
@@ -72,7 +72,7 @@ elif name != 'cosign':
         env = dict(os.environ, PATH=str(self.directory) + os.pathsep + os.environ['PATH'],
                    TMPDIR=str(self.directory), COMMAND_LOG=str(self.log), GITHUB_ACTIONS='true',
                    GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='1', GITHUB_ACTOR='ci-actor',
-                   REGISTRY_TOKEN='test-only-token', **variables)
+                   REGISTRY_USERNAME='example+ci', REGISTRY_TOKEN='test-only-token', **variables)
         result = subprocess.run(['bash', str(ROOT / 'scripts/check-registry-policy.sh'),
                                  'localhost/gniri:build', REPOSITORY, DIGEST],
                                 cwd=ROOT, env=env, text=True, capture_output=True)
@@ -128,4 +128,4 @@ elif name != 'cosign':
         self.assertIn('--network=none', step)
         self.assertIn('localhost/gniri:build /src/tests/signature-transport-smoke.py', step)
         self.assertLess(workflow.index('Offline signature transport regression'),
-                        workflow.index('name: Publish signed image to GHCR'))
+                        workflow.index('name: Publish signed image to Quay.io'))

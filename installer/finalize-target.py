@@ -73,7 +73,7 @@ def verify_arguments(before, after, flags):
 
 
 def signed_origin(current, target):
-    if not re.fullmatch(r'ghcr.io/[a-z0-9._/-]+:(stable|latest)', target):
+    if not re.fullmatch(r'quay\.io/[a-z0-9._/-]+:(stable|latest)', target):
         raise ValueError('Expected a published stable/latest update target')
     allowed = ('ostree-unverified-registry:' + target,
                'ostree-unverified-image:docker://' + target,

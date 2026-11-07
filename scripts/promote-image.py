@@ -11,6 +11,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 GATE = runpy.run_path(str(ROOT / 'scripts/release-gate.py'))['validate']
 FEDORA_VERSION = runpy.run_path(str(ROOT / 'scripts/build-image.py'))['fedora_version']
+IMAGE_REPOSITORY = runpy.run_path(str(ROOT / 'scripts/registry.py'))['image_repository']
 
 
 def command(*args):
@@ -91,7 +92,7 @@ def main():
         raise ValueError('Evidence filename and payload identity differ')
     validate_run(record, json.loads(args.run.read_text()), args.repository)
     validate_environment(json.loads(args.environment.read_text()), json.loads(args.branches.read_text()))
-    image = 'ghcr.io/' + args.repository.lower()
+    image = IMAGE_REPOSITORY(args.repository)
     candidate, stable = image + '@' + args.digest, image + ':stable'
     baseline = json.loads(command('skopeo', 'inspect', 'docker://' + stable))['Digest']
     if args.expected_stable and baseline != args.expected_stable:

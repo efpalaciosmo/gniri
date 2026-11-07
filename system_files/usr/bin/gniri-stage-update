@@ -60,7 +60,7 @@ def save_state(path, outcome, message, now=None, staged_digest=None):
 
 
 def update_reference(reference, status):
-    if not reference.startswith('ghcr.io/'):
+    if not reference.startswith('quay.io/'):
         raise UpdateSkipped('Local development image: registry updates are unavailable.')
     if status['spec'].get('bootOrder') == 'rollback' or status['status'].get('rollbackQueued'):
         raise UpdateSkipped('Rollback queued; update skipped.')
@@ -112,7 +112,7 @@ def main():
         reference = REFERENCE_FILE.read_text().strip()
         if PAUSE.exists():
             raise UpdateSkipped('Updates paused by /etc/gniri/updates-paused.')
-        if not reference.startswith('ghcr.io/'):
+        if not reference.startswith('quay.io/'):
             raise UpdateSkipped('Local development image: registry updates are unavailable.')
         status = json.loads(subprocess.check_output(['bootc', 'status', '--json']))
         reference = update_reference(reference, status)

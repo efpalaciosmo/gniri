@@ -11,7 +11,7 @@ DIGEST = 'sha256:' + 'a' * 64
 
 @unittest.skipIf(os.geteuid() == 0, 'Exercises the unprivileged installer entry point')
 class PublishedInstallerTests(unittest.TestCase):
-    def run_recipe(self, target='ghcr.io/example/gniri:stable', **variables):
+    def run_recipe(self, target='quay.io/example/gniri:stable', **variables):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             log = directory / 'commands.jsonl'
@@ -40,10 +40,10 @@ if name=='cosign': sys.exit(int(os.environ.get('VERIFY_EXIT','0')))
         result, calls = self.run_recipe()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual([call[0] for call in calls], ['skopeo', 'cosign', 'sudo'])
-        self.assertEqual(calls[1][-1], 'ghcr.io/example/gniri@' + DIGEST)
+        self.assertEqual(calls[1][-1], 'quay.io/example/gniri@' + DIGEST)
         self.assertEqual(calls[2], ['sudo', 'bash', 'scripts/build-iso.sh',
-                                  'ghcr.io/example/gniri@' + DIGEST,
-                                  'ghcr.io/example/gniri:stable', 'host', '1'])
+                                  'quay.io/example/gniri@' + DIGEST,
+                                  'quay.io/example/gniri:stable', 'host', '1'])
 
     def test_invalid_target_or_failed_signature_cannot_start_privileged_build(self):
         result, calls = self.run_recipe(target='localhost/gniri:development')

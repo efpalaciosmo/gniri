@@ -19,7 +19,9 @@ on:
 permissions:
   contents: read
   actions: read
-  packages: read
+
+env:
+  QUAY_NAMESPACE: ${{ vars.QUAY_NAMESPACE }}
 
 concurrency:
   group: gniri-stable-promotion
@@ -44,15 +46,18 @@ jobs:
         id: review
         env:
           GH_TOKEN: ${{ github.token }}
-          REGISTRY_TOKEN: ${{ github.token }}
+          REGISTRY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+          REGISTRY_TOKEN: ${{ secrets.QUAY_TOKEN }}
           DIGEST: ${{ inputs.digest }}
           RUN_ID: ${{ inputs.run_id }}
           RUN_ATTEMPT: ${{ inputs.run_attempt }}
         run: |
           set -euo pipefail
           [[ $DIGEST =~ ^sha256:[a-f0-9]{64}$ && $RUN_ID =~ ^[1-9][0-9]*$ && $RUN_ATTEMPT =~ ^[1-9][0-9]*$ ]]
-          printf '%s' "$REGISTRY_TOKEN" | skopeo login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          printf '%s' "$REGISTRY_TOKEN" | cosign login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          test -n "$REGISTRY_USERNAME"
+          test -n "$REGISTRY_TOKEN"
+          printf '%s' "$REGISTRY_TOKEN" | skopeo login quay.io -u "$REGISTRY_USERNAME" --password-stdin
+          printf '%s' "$REGISTRY_TOKEN" | cosign login quay.io -u "$REGISTRY_USERNAME" --password-stdin
           mkdir -p output/promotion
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT" > output/promotion/run.json
           gh api "repos/$GITHUB_REPOSITORY/environments/stable" > output/promotion/environment.json
@@ -67,7 +72,6 @@ jobs:
     permissions:
       contents: read
       actions: read
-      packages: write
       deployments: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -81,7 +85,8 @@ jobs:
       - name: Promote the same reviewed digest without rebuilding
         env:
           GH_TOKEN: ${{ github.token }}
-          REGISTRY_TOKEN: ${{ github.token }}
+          REGISTRY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+          REGISTRY_TOKEN: ${{ secrets.QUAY_TOKEN }}
           DIGEST: ${{ inputs.digest }}
           RUN_ID: ${{ inputs.run_id }}
           RUN_ATTEMPT: ${{ inputs.run_attempt }}
@@ -90,8 +95,10 @@ jobs:
         run: |
           set -euo pipefail
           [[ $DIGEST =~ ^sha256:[a-f0-9]{64}$ && $RUN_ID =~ ^[1-9][0-9]*$ && $RUN_ATTEMPT =~ ^[1-9][0-9]*$ ]]
-          printf '%s' "$REGISTRY_TOKEN" | skopeo login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          printf '%s' "$REGISTRY_TOKEN" | cosign login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          test -n "$REGISTRY_USERNAME"
+          test -n "$REGISTRY_TOKEN"
+          printf '%s' "$REGISTRY_TOKEN" | skopeo login quay.io -u "$REGISTRY_USERNAME" --password-stdin
+          printf '%s' "$REGISTRY_TOKEN" | cosign login quay.io -u "$REGISTRY_USERNAME" --password-stdin
           mkdir -p output/promotion
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT" > output/promotion/run.json
           gh api "repos/$GITHUB_REPOSITORY/environments/stable" > output/promotion/environment.json

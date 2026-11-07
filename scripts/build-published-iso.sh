@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Resolve the intended registry channel, never a local build tag.
 set -euo pipefail
-target=${1:?Expected a GHCR update reference}
+target=${1:?Expected a Quay.io update reference}
 network=${2:-}
 refresh=${3:-0}
-[[ $target =~ ^ghcr.io/[a-z0-9._/-]+:stable$ ]] || {
-    printf 'The permanent installer requires ghcr.io/owner/image:stable.\n' >&2
+[[ $target =~ ^quay\.io/[a-z0-9._/-]+:stable$ ]] || {
+    printf 'The permanent installer requires quay.io/owner/image:stable.\n' >&2
     exit 1
 }
 digest=$(skopeo inspect --format '{{.Digest}}' "docker://$target")

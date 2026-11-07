@@ -15,7 +15,7 @@ def main():
     if not Path('/run/.containerenv').exists():
         raise SystemExit('Run only in a disposable candidate container without networking.')
     reference = Path('/usr/share/gniri/image-reference').read_text().strip()
-    if not reference.startswith('ghcr.io/'):
+    if not reference.startswith('quay.io/'):
         raise SystemExit('This test requires the published-image policy configuration.')
     strict = json.loads(Path('/usr/share/gniri/bootc-policy.json').read_text())
     with tempfile.TemporaryDirectory(prefix='gniri-policy-', dir='/var/tmp') as temporary:

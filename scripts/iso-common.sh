@@ -5,11 +5,11 @@ gniri_validate_iso_refs() {
     if [[ $payload == localhost/gniri:development && $target == "$payload" ]]; then
         return 0
     fi
-    if [[ $payload =~ ^ghcr.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ &&
-          $target =~ ^ghcr.io/[a-z0-9._/-]+:(stable|latest)$ &&
+    if [[ $payload =~ ^quay\.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ &&
+          $target =~ ^quay\.io/[a-z0-9._/-]+:(stable|latest)$ &&
           ${payload%@*} == "${target%:*}" ]]; then
         return 0
     fi
-    printf 'Use the local development image for both refs, or a GHCR digest and matching :stable/:latest target.\n' >&2
+    printf 'Use the local development image for both refs, or a Quay.io digest and matching :stable/:latest target.\n' >&2
     return 1
 }

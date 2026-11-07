@@ -37,7 +37,7 @@ distribución rolling ni garantiza transiciones de versión sin mantenimiento.
 make check
 make build
 make build REFRESH=1  # Renueva también los RPM aunque la base no haya cambiado.
-make iso    # Instalador del stable publicado y verificado; origen GHCR permanente.
+make iso    # Instalador del stable publicado y verificado; origen Quay.io permanente.
 # Para desarrollo sin actualizaciones de registro: make iso-local
 ```
 
@@ -46,19 +46,19 @@ make iso    # Instalador del stable publicado y verificado; origen GHCR permanen
 Los builds locales reutilizan capas y omiten repacking para iterar más rápido.
 `RECHUNK=1` reorganiza y valida las capas OCI; CI lo activa para candidatos firmados.
 
-En GitHub, **Build and publish image** publica una imagen firmada en GHCR por cambios
+En GitHub, **Build and publish image** publica una imagen firmada en Quay.io por cambios
 en `main` y **cada sábado a las 05:00 de Bogotá (10:00 UTC)**. Puedes descargarla:
 
 ```sh
-docker pull ghcr.io/efpalaciosmo/gniri:latest
-# También: podman pull ghcr.io/efpalaciosmo/gniri:latest
+docker pull quay.io/efpalaciosmo/gniri:latest
+# También: podman pull quay.io/efpalaciosmo/gniri:latest
 ```
 
-Si el paquete es privado, ejecuta antes `docker login ghcr.io -u efpalaciosmo`
-(o `podman login`) y usa como contraseña un token clásico de GitHub con
-[`read:packages`](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic).
+Si el repositorio de imagen es privado, ejecuta antes `docker login quay.io -u 'NAMESPACE+ROBOT'`
+(o `podman login`) y usa como contraseña el token de un robot de Quay con permiso de lectura.
 Para descargas sin credenciales, la [configuración inicial](docs/building.md#github-configuración-inicial)
-explica cómo hacer público el paquete.
+explica cómo hacer público el repositorio de imagen y configurar `QUAY_USERNAME`,
+`QUAY_TOKEN` y, opcionalmente, `QUAY_NAMESPACE` en Actions.
 
 `latest` es el candidato más reciente; las instalaciones siguen el canal revisado
 `stable`. [`build.yml`](.github/workflows/build.yml) construye y firma candidatos.

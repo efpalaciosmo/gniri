@@ -26,7 +26,7 @@ class InstallerSmokeContainerTests(unittest.TestCase):
         for channel in ('stable', 'latest'):
             with self.subTest(channel=channel), tempfile.TemporaryDirectory() as temporary:
                 tree = Path(temporary)
-                target = f'ghcr.io/example/gniri:{channel}'
+                target = f'quay.io/example/gniri:{channel}'
                 with patch.object(finalizer_smoke.shutil, 'copyfile', wraps=shutil.copyfile) as copy:
                     finalizer_smoke.prepare_trust(tree, target)
                 trust = tree / 'usr/share/gniri'
@@ -35,7 +35,7 @@ class InstallerSmokeContainerTests(unittest.TestCase):
                                  (ROOT / 'trust/cosign.pub').read_bytes())
                 self.assertEqual(json.loads((trust / 'bootc-policy.json').read_text()), {
                     'default': [{'type': 'reject'}], 'transports': {'docker': {
-                        'ghcr.io/example/gniri': [{'type': 'sigstoreSigned',
+                        'quay.io/example/gniri': [{'type': 'sigstoreSigned',
                             'keyPath': '/usr/share/gniri/keys/cosign.pub',
                             'signedIdentity': {'type': 'matchRepository'}}]}}})
 
@@ -44,7 +44,7 @@ class InstallerSmokeContainerTests(unittest.TestCase):
             base = Path(temporary)
             with patch.object(finalizer_smoke, 'ROOT', base / 'missing-checkout'):
                 with self.assertRaises(FileNotFoundError):
-                    finalizer_smoke.prepare_trust(base / 'tree', 'ghcr.io/example/gniri:stable')
+                    finalizer_smoke.prepare_trust(base / 'tree', 'quay.io/example/gniri:stable')
             self.assertFalse((base / 'tree/usr/share/gniri/bootc-policy.json').exists())
 
     def test_mount_and_finalizer_containers_allow_mounts_without_host_access(self):

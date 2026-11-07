@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 RELEASE = runpy.run_path(str(ROOT / 'scripts/prepare-release.py'))
@@ -21,6 +22,9 @@ ISO_NAME = 'gniri-x86_64.iso'
 
 class ReleaseAssetTests(unittest.TestCase):
     def setUp(self):
+        namespace = patch.dict(os.environ, {'QUAY_NAMESPACE': ''})
+        namespace.start()
+        self.addCleanup(namespace.stop)
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.directory = Path(self.temporary.name)
@@ -42,9 +46,9 @@ class ReleaseAssetTests(unittest.TestCase):
             'conclusion': 'success',
         }
         self.metadata = {
-            'payload_reference': f'ghcr.io/example/gniri@{DIGEST}',
+            'payload_reference': f'quay.io/example/gniri@{DIGEST}',
             'source_revision': REVISION, 'installer_source_revision': REVISION,
-            'update_reference': 'ghcr.io/example/gniri:stable',
+            'update_reference': 'quay.io/example/gniri:stable',
             'iso_checksum': f'{self.sha256}  {ISO_NAME}',
         }
         (self.artifacts / ISO_NAME).write_bytes(self.content)
@@ -71,6 +75,15 @@ class ReleaseAssetTests(unittest.TestCase):
         notes = (self.output / 'release-notes.md').read_text()
         self.assertIn('cosign verify-blob', notes)
         self.assertNotIn('cat gniri', notes)
+
+    def test_release_metadata_is_bound_to_the_configured_quay_namespace(self):
+        self.metadata.update(payload_reference=f'quay.io/quay-organization/gniri@{DIGEST}',
+                             update_reference='quay.io/quay-organization/gniri:stable')
+        self.write_json('build.json', self.metadata)
+        with patch.dict(os.environ, {'QUAY_NAMESPACE': 'quay-organization'}):
+            self.prepare()
+        self.assertIn(f'quay.io/quay-organization/gniri@{DIGEST}',
+                      (self.output / 'release-notes.md').read_text())
 
     def test_large_iso_parts_reassemble_to_the_tested_bytes(self):
         self.prepare(part_size=10)
@@ -109,10 +122,10 @@ class ReleaseAssetTests(unittest.TestCase):
                 self.run = original
 
     def test_other_payload_sources_installers_targets_or_checksums_are_rejected(self):
-        for field, value in [('payload_reference', f'ghcr.io/other/gniri@{DIGEST}'),
+        for field, value in [('payload_reference', f'quay.io/other/gniri@{DIGEST}'),
                              ('source_revision', 'c' * 40),
                              ('installer_source_revision', 'c' * 40),
-                             ('update_reference', 'ghcr.io/example/gniri:latest'),
+                             ('update_reference', 'quay.io/example/gniri:latest'),
                              ('iso_checksum', '0' * 64 + '  ' + ISO_NAME)]:
             with self.subTest(field=field):
                 self.write_json('build.json', {**self.metadata, field: value})
@@ -263,7 +276,8 @@ if name == 'cosign':
             sudo.write_text('#!/usr/bin/env bash\nexec "$@"\n')
             sudo.chmod(0o755)
             env = dict(os.environ, PATH=str(directory) + os.pathsep + os.environ['PATH'],
-                       OWNER='Example', CHANNEL=channel, REQUESTED_DIGEST=digest, MOCK_DIGEST=DIGEST,
+                       GITHUB_REPOSITORY='Example/gniri', QUAY_NAMESPACE='',
+                       CHANNEL=channel, REQUESTED_DIGEST=digest, MOCK_DIGEST=DIGEST,
                        COMMAND_LOG=str(log), GITHUB_OUTPUT=str(output))
             env.update(variables)
             result = subprocess.run(['/usr/bin/bash', '-c', script], cwd=ROOT,
@@ -277,10 +291,10 @@ if name == 'cosign':
                 result, calls, output = self.resolve(channel=channel)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual([call[0] for call in calls], ['skopeo', 'cosign'])
-                self.assertEqual(calls[0][-1], f'docker://ghcr.io/example/gniri:{channel}')
-                self.assertEqual(calls[1][-1], f'ghcr.io/example/gniri@{DIGEST}')
-                self.assertIn(f'payload=ghcr.io/example/gniri@{DIGEST}\n', output)
-                self.assertIn(f'target=ghcr.io/example/gniri:{channel}\n', output)
+                self.assertEqual(calls[0][-1], f'docker://quay.io/example/gniri:{channel}')
+                self.assertEqual(calls[1][-1], f'quay.io/example/gniri@{DIGEST}')
+                self.assertIn(f'payload=quay.io/example/gniri@{DIGEST}\n', output)
+                self.assertIn(f'target=quay.io/example/gniri:{channel}\n', output)
 
     def test_explicit_digest_does_not_resolve_a_mutable_tag(self):
         workflow = (ROOT / '.github/workflows/iso.yml').read_text()
@@ -288,11 +302,19 @@ if name == 'cosign':
         result, calls, output = self.resolve(channel='latest', digest=DIGEST)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual([call[0] for call in calls], ['cosign'])
-        self.assertIn(f'payload=ghcr.io/example/gniri@{DIGEST}\n', output)
+        self.assertIn(f'payload=quay.io/example/gniri@{DIGEST}\n', output)
+
+    def test_quay_namespace_can_differ_from_the_github_owner(self):
+        result, calls, output = self.resolve(QUAY_NAMESPACE='quay-organization')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(calls[0][-1], 'docker://quay.io/quay-organization/gniri:stable')
+        self.assertEqual(calls[1][-1], f'quay.io/quay-organization/gniri@{DIGEST}')
+        self.assertIn('target=quay.io/quay-organization/gniri:stable\n', output)
 
     def test_invalid_inputs_or_failed_signatures_do_not_emit_build_references(self):
         for variables in ({'channel': 'other'}, {'digest': 'latest'},
                           {'digest': DIGEST + '\ninjected=value'},
+                          {'QUAY_NAMESPACE': 'invalid/namespace'},
                           {'MOCK_DIGEST': 'not-a-digest'}, {'VERIFY_EXIT': '9'}):
             with self.subTest(variables=variables):
                 result, _, output = self.resolve(**variables)
@@ -307,8 +329,8 @@ if name == 'cosign':
         with tempfile.TemporaryDirectory() as temporary:
             summary = Path(temporary) / 'summary.md'
             env = dict(os.environ, GITHUB_STEP_SUMMARY=str(summary),
-                       PAYLOAD_REF=f'ghcr.io/example/gniri@{DIGEST}',
-                       TARGET_REF='ghcr.io/example/gniri:latest',
+                       PAYLOAD_REF=f'quay.io/example/gniri@{DIGEST}',
+                       TARGET_REF='quay.io/example/gniri:latest',
                        ARTIFACT_URL='https://github.com/example/gniri/artifact/123')
             result = subprocess.run(['/usr/bin/bash', '-eu', '-o', 'pipefail', '-c', script],
                                     env=env, text=True, capture_output=True)
@@ -334,8 +356,8 @@ class DeliveryWorkflowTests(unittest.TestCase):
         self.assertNotIn('build-iso.sh', workflow)
         self.assertNotIn('release-gate.py', workflow)
         self.assertIn('workflow_dispatch:', workflow)
-        self.assertIn('packages: write', jobs)
-        self.assertIn('name: Publish signed image to GHCR', jobs)
+        self.assertNotIn('packages:', workflow)
+        self.assertIn('name: Publish signed image to Quay.io', jobs)
         promotion = (workflows / 'promote.yml').read_text()
         self.assertIn('environment: stable', promotion)
         self.assertIn('needs: validate', promotion)
@@ -368,7 +390,7 @@ class DeliveryWorkflowTests(unittest.TestCase):
         workflow = (ROOT / '.github/workflows/iso.yml').read_text()
         self.assertIn('workflow_dispatch:', workflow)
         self.assertIn('default: stable', workflow)
-        self.assertIn('packages: read', workflow)
+        self.assertNotIn('packages:', workflow)
         for forbidden in ('push:', 'pull_request:', 'schedule:', 'workflow_run:',
                           'contents: write', 'packages: write', 'COSIGN_PRIVATE_KEY',
                           'cosign sign', 'gh release', 'promote-image.py', 'build-image.py'):

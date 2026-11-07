@@ -51,7 +51,8 @@ class GitHubSetupTests(unittest.TestCase):
         self.commands.append(command)
         if command[:3] == ['gh', 'secret', 'list']:
             return subprocess.CompletedProcess(command, 0, json.dumps([
-                {'name': 'COSIGN_PRIVATE_KEY'}, {'name': 'COSIGN_PASSWORD'}]))
+                {'name': name} for name in ('COSIGN_PRIVATE_KEY', 'COSIGN_PASSWORD',
+                                          'QUAY_USERNAME', 'QUAY_TOKEN')]))
         if command[:3] == ['gh', 'repo', 'edit']:
             self.private = False
             return subprocess.CompletedProcess(command, 0)
@@ -108,6 +109,19 @@ class GitHubSetupTests(unittest.TestCase):
         with patch.dict(SETUP['configure'].__globals__, {'api': self.api}), \
                 patch('subprocess.run', side_effect=missing):
             with self.assertRaisesRegex(ValueError, 'no keys were generated or rotated'):
+                SETUP['configure'](REPOSITORY, 'example', make_public=True)
+        self.assertTrue(self.private)
+        self.assertTrue(all(method == 'GET' for _, method, _ in self.calls))
+
+    def test_missing_quay_credentials_stop_before_changing_settings(self):
+        def missing(command, **kwargs):
+            self.assertEqual(command[:3], ['gh', 'secret', 'list'])
+            return subprocess.CompletedProcess(command, 0, json.dumps([
+                {'name': 'COSIGN_PRIVATE_KEY'}, {'name': 'COSIGN_PASSWORD'}]))
+
+        with patch.dict(SETUP['configure'].__globals__, {'api': self.api}), \
+                patch('subprocess.run', side_effect=missing):
+            with self.assertRaisesRegex(ValueError, 'Quay robot-account secrets'):
                 SETUP['configure'](REPOSITORY, 'example', make_public=True)
         self.assertTrue(self.private)
         self.assertTrue(all(method == 'GET' for _, method, _ in self.calls))

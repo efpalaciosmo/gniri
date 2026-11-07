@@ -11,9 +11,9 @@ Run commands from the repository root. Image builds require Linux x86_64, Podman
 - `make check`: run source checks and Python unit tests.
 - `make build`: run checks and build `localhost/gniri:development`; produces an image only. Repacking is opt-in locally.
 - `make check-desktop`: after building, verify Ghostty maps a window in nested Niri inside a disposable headless container.
-- `make iso`: verify the published stable digest and generate `output/iso/gniri-x86_64.iso` with a permanent signed GHCR origin; requires Skopeo/Cosign and privileged installer operations.
+- `make iso`: verify the published stable digest and generate `output/iso/gniri-x86_64.iso` with a permanent signed Quay.io origin; requires Skopeo/Cosign and privileged installer operations.
 - `make iso-local`: build a development-only local installer without registry updates.
-- `make iso-candidate PAYLOAD_REF=ghcr.io/owner/gniri@sha256:...`: test a signed candidate on the latest channel.
+- `make iso-candidate PAYLOAD_REF=quay.io/owner/gniri@sha256:...`: test a signed candidate on the latest channel.
 - `make build RECHUNK=1`: enable validated layer repacking (local builds skip it by default).
 - `make build REFRESH=1`: rerun package transactions while preserving download caches.
 - `sudo make check-installer`: run real mount/finalizer regressions in the built rootful installer.

@@ -12,13 +12,13 @@ spec.loader.exec_module(finalize)
 
 class RootMountTests(unittest.TestCase):
     def test_registry_origin_is_signed_before_first_boot_without_changing_source(self):
-        target = 'ghcr.io/example/gniri:stable'
+        target = 'quay.io/example/gniri:stable'
         for prefix in ('ostree-unverified-registry:', 'ostree-unverified-image:docker://',
                        'ostree-image-signed:docker://'):
             self.assertEqual(finalize.signed_origin(prefix + target, target),
                              'ostree-image-signed:docker://' + target)
         for current in ('ostree-unverified-registry:localhost/gniri:development',
-                        'ostree-unverified-registry:ghcr.io/other/system:stable'):
+                        'ostree-unverified-registry:quay.io/other/system:stable'):
             with self.assertRaises(ValueError):
                 finalize.signed_origin(current, target)
         with self.assertRaises(ValueError):

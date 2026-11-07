@@ -12,15 +12,15 @@ import runpy
 signature_policies = runpy.run_path('/run/gniri-build/signature-policy.py')['signature_policies']
 
 reference = sys.argv[1]
-if not re.fullmatch(r'(localhost/gniri:development|ghcr\.io/[a-z0-9._/-]+:[a-z0-9._-]+)', reference):
-    raise SystemExit('Use localhost/gniri:development or a lower-case tagged GHCR image reference.')
+if not re.fullmatch(r'(localhost/gniri:development|quay\.io/[a-z0-9._/-]+:[a-z0-9._-]+)', reference):
+    raise SystemExit('Use localhost/gniri:development or a lower-case tagged Quay.io image reference.')
 share = Path('/usr/share/gniri')
 share.mkdir(exist_ok=True)
 # rpm-ostree's inherited tmpfiles rules expect this directory. Materialize it
 # while /usr is writable, rather than trying to create it at boot on composefs.
 Path('/usr/local/sbin').mkdir(mode=0o755, parents=True, exist_ok=True)
 (share / 'image-reference').write_text(reference + '\n')
-if reference.startswith('ghcr.io/'):
+if reference.startswith('quay.io/'):
     public_key = Path('/run/gniri-build/trust/cosign.pub')
     if not public_key.is_file():
         raise SystemExit('Publishing requires trust/cosign.pub; see docs/building.md.')

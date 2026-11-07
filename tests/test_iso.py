@@ -6,7 +6,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL = 'localhost/gniri:development'
-REMOTE = 'ghcr.io/example/gniri'
+REMOTE = 'quay.io/example/gniri'
 DIGEST = 'sha256:' + 'a' * 64
 
 
@@ -29,7 +29,13 @@ class IsoReferencesTests(unittest.TestCase):
         self.assertNotEqual(self.validate(f'{REMOTE}@{DIGEST}', LOCAL).returncode, 0)
 
     def test_wrong_repository_is_rejected(self):
-        self.assertNotEqual(self.validate(f'{REMOTE}@{DIGEST}', 'ghcr.io/other/gniri:stable').returncode, 0)
+        self.assertNotEqual(self.validate(f'{REMOTE}@{DIGEST}', 'quay.io/other/gniri:stable').returncode, 0)
+
+    def test_old_registry_and_lookalike_hostnames_are_rejected(self):
+        for repository in ('ghcr.io/example/gniri', 'quayXio/example/gniri'):
+            with self.subTest(repository=repository):
+                self.assertNotEqual(self.validate(f'{repository}@{DIGEST}',
+                                                 f'{repository}:stable').returncode, 0)
 
     def test_invalid_inputs_are_rejected(self):
         for value in ('', '../image', 'localhost/gniri:other', '$(touch /tmp/never)', 'image\nreboot'):
@@ -39,7 +45,7 @@ class IsoReferencesTests(unittest.TestCase):
     def test_make_iso_defaults_to_the_published_registry_channel(self):
         result = subprocess.run(['make', '-n', 'iso'], cwd=ROOT, text=True,
                                 capture_output=True, check=True)
-        self.assertIn("bash scripts/build-published-iso.sh 'ghcr.io/efpalaciosmo/gniri:stable'", result.stdout)
+        self.assertIn("bash scripts/build-published-iso.sh 'quay.io/efpalaciosmo/gniri:stable'", result.stdout)
         self.assertNotIn('scripts/build-local-iso.sh', result.stdout)
         self.assertNotIn('build IMAGE=localhost', result.stdout)
 
